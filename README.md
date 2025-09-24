@@ -288,11 +288,3 @@ cd frontend
 npm run build
 ```
 Los archivos generados en `build/` pueden servirse con cualquier servidor web estático.
-
-## Contribución
-
-1. Fork del repositorio
-2. Crear rama de feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit de cambios (`git commit -am 'Agregar nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Crear Pull Request
