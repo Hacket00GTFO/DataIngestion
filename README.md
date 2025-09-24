@@ -6,6 +6,11 @@ Sistema completo de ingesta y procesamiento de datos para evidencia big data, co
 
 Este proyecto implementa un sistema de data wrangling capaz de procesar registros basados en las columnas del archivo `evidencia big data.xlsx`. El sistema permite la ingesta de nuevos datos a través de una interfaz web moderna y el procesamiento automático de archivos Excel.
 
+**Objetivo Principal:**
+- Realizar procesos de data wrangling con los registros de las columnas del archivo `evidencia big data.xlsx`
+- Generar reportes del procesamiento de datos desde el frontend
+- Proporcionar una interfaz intuitiva para el análisis y visualización de datos procesados
+
 ## Arquitectura del Sistema
 
 ### Backend (Python + FastAPI)
@@ -41,6 +46,9 @@ backend/
 - API RESTful con documentación automática (Swagger/OpenAPI)
 - Validación robusta de datos con Pydantic
 - Procesamiento de archivos Excel con pandas
+- **Capacidad de digerir datos extraños/externos de múltiples fuentes**
+- **Procesamiento de formatos de datos no estándar**
+- **Adaptación automática a esquemas de datos variables**
 - Limpieza automática de datos (duplicados, nulos, normalización)
 - Manejo de errores y logging
 - CORS configurado para integración con frontend
@@ -87,6 +95,11 @@ frontend/
 - Formulario dinámico basado en esquema de datos
 - Visualizador de datos con paginación y búsqueda
 - Subida de archivos Excel
+- **Capacidad de procesar y visualizar datos extraños/externos**
+- **Interfaz adaptativa para diferentes formatos de datos**
+- **Visualización de datos no estructurados**
+- **Generación de reportes del procesamiento de datos**
+- **Visualización de resultados de data wrangling**
 - Manejo de estado con Context API
 - Validación de formularios en tiempo real
 - Diseño mobile-first
@@ -155,6 +168,8 @@ npm start
 ### 2. Ingesta de Datos
 - **Subida de archivos Excel**: Procesamiento automático de archivos
 - **Ingreso manual**: Formulario dinámico basado en esquema
+- **Ingesta de datos extraños/externos**: Procesamiento de fuentes de datos no estándar
+- **Adaptación automática**: Detección y mapeo de esquemas de datos variables
 - **Validación**: Verificación automática de datos
 - **Procesamiento**: Limpieza y normalización de datos
 
@@ -164,19 +179,42 @@ npm start
 - Ordenamiento por columnas
 - Paginación para grandes volúmenes de datos
 
+### 4. Data Wrangling y Reportes
+- **Procesamiento de columnas del archivo `evidencia big data.xlsx`**
+- **Generación automática de reportes de procesamiento**
+- **Visualización de estadísticas de limpieza de datos**
+- **Exportación de reportes en diferentes formatos**
+- **Seguimiento del estado de procesamiento en tiempo real**
+
 ## API Endpoints
 
 ### Datos
 - `POST /api/v1/data/ingest` - Ingesta de nuevos datos
 - `POST /api/v1/data/upload-excel` - Subida de archivo Excel
+- `POST /api/v1/data/ingest-external` - Ingesta de datos extraños/externos
+- `POST /api/v1/data/process-raw` - Procesamiento de datos no estructurados
 - `GET /api/v1/data/statistics` - Estadísticas de datos
 - `GET /api/v1/data/schema` - Esquema de datos
+- `GET /api/v1/data/sources` - Fuentes de datos disponibles
 
 ### Salud del Sistema
 - `GET /api/v1/health` - Verificación básica de salud
 - `GET /api/v1/health/detailed` - Verificación detallada
 
 ## Procesamiento de Datos
+
+### Data Wrangling con `evidencia big data.xlsx`
+- **Procesamiento específico de columnas del archivo Excel**
+- **Mapeo automático de campos según el esquema definido**
+- **Validación de estructura de datos contra el archivo de referencia**
+- **Procesamiento batch de registros masivos**
+
+### Procesamiento de Datos Extraños/Externos
+- **Detección automática de formatos de datos no estándar**
+- **Adaptación dinámica a esquemas de datos variables**
+- **Procesamiento de fuentes de datos heterogéneas**
+- **Normalización de datos de diferentes orígenes**
+- **Manejo de datos malformados o incompletos**
 
 ### Validación
 - Verificación de columnas requeridas
@@ -195,6 +233,13 @@ npm start
 - Agregaciones estadísticas
 - Filtrado por criterios específicos
 - Exportación a diferentes formatos
+
+### Generación de Reportes
+- **Reportes automáticos del procesamiento de datos**
+- **Métricas de calidad de datos procesados**
+- **Estadísticas de limpieza y transformación**
+- **Visualización de resultados en el frontend**
+- **Exportación de reportes en PDF, Excel y CSV**
 
 ## Configuración de Desarrollo
 
