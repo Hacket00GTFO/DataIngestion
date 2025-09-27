@@ -12,6 +12,9 @@ on:
 jobs:
   sync-branches:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
     
     steps:
       - name: Checkout repository
@@ -24,12 +27,17 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
       
-      - name: Sync Backend branch
+      - name: Verify permissions and fetch branches
         run: |
           # Fetch all branches
           git fetch origin
-          
+          echo "✅ Successfully fetched all branches"
+          echo "Current repository: $(git remote get-url origin)"
+      
+      - name: Sync Backend branch
+        run: |
           # Check if Backend branch exists
           if git show-ref --verify --quiet refs/remotes/origin/Backend; then
             echo "Backend branch exists, syncing..."
