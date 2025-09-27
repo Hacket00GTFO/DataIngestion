@@ -1,0 +1,11 @@
+# CODEOWNERS file for DataIngestion
+# Controla quién puede aprobar cambios desde Backend y Frontend a Development
+
+# Solo branToRep y HilaryCamacho pueden aprobar PRs desde Backend
+/Backend/ @branToRep @HilaryCamacho
+
+# Solo JaobSandoval y solmuz pueden aprobar PRs desde Frontend  
+/Frontend/ @JaobSandoval @solmuz
+
+# Development - Todos pueden contribuir
+/Development/ @branToRep @HilaryCamacho @JaobSandoval @solmuz @NorbertoSuas
