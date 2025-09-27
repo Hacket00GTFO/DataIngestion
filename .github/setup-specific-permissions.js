@@ -2,8 +2,10 @@
 
 /**
  * Script para configurar permisos específicos por branch
- * - Backend: Solo branToRep, HilaryCamacho pueden hacer PR
- * - Frontend: Solo JaobSandoval, solmuz pueden hacer PR
+ * - Backend: Cualquier usuario puede hacer push directo
+ * - Frontend: Cualquier usuario puede hacer push directo
+ * - CODEOWNERS: Solo branToRep, HilaryCamacho pueden aprobar PRs desde Backend
+ * - CODEOWNERS: Solo JaobSandoval, solmuz pueden aprobar PRs desde Frontend
  * - NorbertoSuas: Acceso completo a todo
  */
 
@@ -88,7 +90,7 @@ async function setupBackendProtection() {
         }
       },
       restrictions: {
-        users: ['branToRep', 'HilaryCamacho', 'NorbertoSuas'], // Solo estos pueden hacer PR
+        users: [], // Permitir push a cualquier usuario
         teams: [],
         apps: []
       },
@@ -102,7 +104,7 @@ async function setupBackendProtection() {
     const data = JSON.stringify(protectionRules);
     
     await makeGitHubRequest(endpoint, 'PUT', data);
-    console.log('✅ Backend configurado: Solo branToRep, HilaryCamacho, NorbertoSuas pueden hacer PR');
+    console.log('✅ Backend configurado: Cualquier usuario puede hacer push directo');
     
   } catch (error) {
     console.error('❌ Error configurando Backend:', error.message);
@@ -130,7 +132,7 @@ async function setupFrontendProtection() {
         }
       },
       restrictions: {
-        users: ['JaobSandoval', 'solmuz', 'NorbertoSuas'], // Solo estos pueden hacer PR
+        users: [], // Permitir push a cualquier usuario
         teams: [],
         apps: []
       },
@@ -144,7 +146,7 @@ async function setupFrontendProtection() {
     const data = JSON.stringify(protectionRules);
     
     await makeGitHubRequest(endpoint, 'PUT', data);
-    console.log('✅ Frontend configurado: Solo JaobSandoval, solmuz, NorbertoSuas pueden hacer PR');
+    console.log('✅ Frontend configurado: Cualquier usuario puede hacer push directo');
     
   } catch (error) {
     console.error('❌ Error configurando Frontend:', error.message);
@@ -193,6 +195,51 @@ async function setupDevelopmentProtection() {
   }
 }
 
+// Crear archivo CODEOWNERS para controlar quién puede hacer PR desde Backend y Frontend
+async function setupCodeOwners() {
+  try {
+    console.log('📝 Configurando CODEOWNERS para Backend y Frontend...');
+    
+    const codeOwnersContent = `# CODEOWNERS file for DataIngestion
+# Controla quién puede aprobar cambios desde Backend y Frontend a Development
+
+# Solo branToRep y HilaryCamacho pueden aprobar PRs desde Backend
+/Backend/ @branToRep @HilaryCamacho
+
+# Solo JaobSandoval y solmuz pueden aprobar PRs desde Frontend  
+/Frontend/ @JaobSandoval @solmuz
+
+# Development - Todos pueden contribuir
+/Development/ @branToRep @HilaryCamacho @JaobSandoval @solmuz @NorbertoSuas
+`;
+
+    const endpoint = `/repos/${CONFIG.owner}/${CONFIG.repo}/contents/.github/CODEOWNERS`;
+    
+    // Verificar si el archivo ya existe
+    try {
+      await makeGitHubRequest(endpoint, 'GET');
+      console.log('⚠️  CODEOWNERS ya existe, se necesita actualización manual');
+    } catch (error) {
+      if (error.message.includes('404')) {
+        // El archivo no existe, crearlo
+        const fileData = {
+          message: 'Add CODEOWNERS for Backend and Frontend protection',
+          content: Buffer.from(codeOwnersContent).toString('base64'),
+          branch: 'Development'
+        };
+        
+        await makeGitHubRequest(endpoint, 'PUT', JSON.stringify(fileData));
+        console.log('✅ CODEOWNERS creado: Control de PRs desde Backend y Frontend configurado');
+      } else {
+        throw error;
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Error configurando CODEOWNERS:', error.message);
+  }
+}
+
 async function main() {
   console.log('🚀 Configurando permisos específicos por branch...\n');
   
@@ -205,11 +252,14 @@ async function main() {
   await setupBackendProtection();
   await setupFrontendProtection();
   await setupDevelopmentProtection();
+  await setupCodeOwners();
   
   console.log('\n🎉 Configuración completada!');
   console.log('\n📋 Resumen de permisos:');
-  console.log('🔧 Backend: Solo branToRep, HilaryCamacho, NorbertoSuas pueden hacer PR');
-  console.log('🎨 Frontend: Solo JaobSandoval, solmuz, NorbertoSuas pueden hacer PR');
+  console.log('🔧 Backend: Cualquier usuario puede hacer push directo');
+  console.log('🎨 Frontend: Cualquier usuario puede hacer push directo');
+  console.log('📝 CODEOWNERS: Solo branToRep, HilaryCamacho pueden aprobar PRs desde Backend');
+  console.log('📝 CODEOWNERS: Solo JaobSandoval, solmuz pueden aprobar PRs desde Frontend');
   console.log('🌿 Development: Todos los usuarios autorizados pueden hacer PR');
   console.log('👑 NorbertoSuas: Acceso completo a todo el repositorio');
 }
