@@ -1,14 +1,14 @@
 # Configuración de propietarios de código
 # Este archivo define quién debe aprobar cambios en diferentes partes del código
 
-# Backend - Solo el equipo de backend puede aprobar
-/backend/ @branToRep @HilaryCamacho
-/app/ @branToRep @HilaryCamacho
-/backend/app/ @branToRep @HilaryCamacho
+# Backend - Solo branToRep y HilaryCamacho pueden hacer PR
+/backend/ @branToRep @HilaryCamacho @NorbertoSuas
+/app/ @branToRep @HilaryCamacho @NorbertoSuas
+/backend/app/ @branToRep @HilaryCamacho @NorbertoSuas
 
-# Frontend - Solo el equipo de frontend puede aprobar
-/frontend/ @JaobSandoval @solmuz
-/frontend/src/ @JaobSandoval @solmuz
+# Frontend - Solo JaobSandoval y solmuz pueden hacer PR
+/frontend/ @JaobSandoval @solmuz @NorbertoSuas
+/frontend/src/ @JaobSandoval @solmuz @NorbertoSuas
 
 # Configuración de GitHub Actions - Requiere aprobación de todos los usuarios autorizados
 /.github/ @branToRep @HilaryCamacho @JaobSandoval @solmuz

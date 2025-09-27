@@ -30,7 +30,8 @@ jobs:
     - name: Check user permissions
       id: check
       run: |
-        # Lista de usuarios autorizados para hacer merge (edita según necesites)
+        # Lista de usuarios autorizados para trigger sincronización automática
+        # Solo usuarios que pueden hacer push a Development
         ALLOWED_USERS=("branToRep" "HilaryCamacho" "JaobSandoval" "solmuz" "NorbertoSuas")
         
         # Obtener el usuario que hizo el push/merge

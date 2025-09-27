@@ -22,13 +22,13 @@ branches:
         teams: []  # Lista de equipos específicos
         apps: []   # Listas de apps específicas
       
-      # Usuarios autorizados para hacer merge en development
+      # Usuarios autorizados para hacer push/merge en development
       allowed_mergers:
         - "branToRep"          # Usuario con permisos de backend
         - "HilaryCamacho"      # Usuario con permisos de backend
         - "JaobSandoval"       # Usuario con permisos de frontend
         - "solmuz"             # Usuario con permisos de frontend
-        # Agrega más usuarios según necesites
+        - "NorbertoSuas"       # Administrador con acceso completo
       
       # Equipos autorizados para hacer merge
       allowed_teams: []  # Sin equipos específicos configurados
@@ -53,8 +53,9 @@ branches:
       
       # Usuarios autorizados para hacer merge en backend
       allowed_mergers:
-        - "branToRep"
-        - "HilaryCamacho"
+        - "branToRep"          # Único autorizado para PR a Backend
+        - "HilaryCamacho"      # Único autorizado para PR a Backend
+        - "NorbertoSuas"       # Administrador con acceso completo
       
       allowed_teams: []  # Sin equipos específicos configurados
 
@@ -78,8 +79,9 @@ branches:
       
       # Usuarios autorizados para hacer merge en frontend
       allowed_mergers:
-        - "JaobSandoval"
-        - "solmuz"
+        - "JaobSandoval"       # Único autorizado para PR a Frontend
+        - "solmuz"             # Único autorizado para PR a Frontend
+        - "NorbertoSuas"       # Administrador con acceso completo
       
       allowed_teams: []  # Sin equipos específicos configurados
 
