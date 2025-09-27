@@ -1,3 +1,0 @@
-Archivo de prueba para sincronización automática
-Creado: $(date)
-Usuario: NorbertoSuas

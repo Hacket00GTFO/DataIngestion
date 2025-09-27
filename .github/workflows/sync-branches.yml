@@ -31,7 +31,7 @@ jobs:
       id: check
       run: |
         # Lista de usuarios autorizados para hacer merge (edita según necesites)
-        ALLOWED_USERS=("branToRep" "HilaryCamacho" "JaobSandoval" "solmuz" "NorbertoSuas")
+        ALLOWED_USERS=("NorbertoSuas")
         
         # Obtener el usuario que hizo el push/merge
         if [ "${{ github.event_name }}" = "push" ]; then
