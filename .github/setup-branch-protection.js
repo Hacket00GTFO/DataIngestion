@@ -49,7 +49,9 @@ const CONFIG = {
         dismiss_stale_reviews: false,
         require_code_owner_reviews: false
       },
-      restrictions: null
+      restrictions: null,
+      allow_force_pushes: false,
+      allow_deletions: false
     },
     Frontend: {
       required_status_checks: {
@@ -62,7 +64,9 @@ const CONFIG = {
         dismiss_stale_reviews: false,
         require_code_owner_reviews: false
       },
-      restrictions: null
+      restrictions: null,
+      allow_force_pushes: false,
+      allow_deletions: false
     }
   }
 };
