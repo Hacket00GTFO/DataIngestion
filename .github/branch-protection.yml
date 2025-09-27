@@ -2,7 +2,7 @@
 # Este archivo define quién puede hacer merge en cada branch
 
 branches:
-  development:
+  Development:
     protection:
       # Configuración básica
       required_status_checks:
@@ -33,7 +33,7 @@ branches:
       # Equipos autorizados para hacer merge
       allowed_teams: []  # Sin equipos específicos configurados
 
-  backend:
+  Backend:
     protection:
       required_status_checks:
         strict: false  # Más flexible para branches de desarrollo
@@ -58,7 +58,7 @@ branches:
       
       allowed_teams: []  # Sin equipos específicos configurados
 
-  frontend:
+  Frontend:
     protection:
       required_status_checks:
         strict: false

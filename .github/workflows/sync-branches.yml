@@ -2,10 +2,10 @@ name: Sync Child Branches with Development
 
 on:
   push:
-    branches: [ development ]
+    branches: [ Development ]
   pull_request:
     types: [ closed ]
-    branches: [ development ]
+    branches: [ Development ]
   workflow_dispatch:  # Permite ejecución manual
     inputs:
       force_sync:
@@ -91,63 +91,63 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
     
-    - name: Sync backend branch
+    - name: Sync Backend branch
       run: |
-        echo "Sincronizando branch backend con development..."
+        echo "Sincronizando branch Backend con Development..."
         
-        # Verificar si el branch backend existe
-        if git show-ref --verify --quiet refs/remotes/origin/backend; then
-          # El branch backend existe, hacer merge
-          git checkout backend
-          git pull origin backend
-          git merge origin/development --no-edit
+        # Verificar si el branch Backend existe
+        if git show-ref --verify --quiet refs/remotes/origin/Backend; then
+          # El branch Backend existe, hacer merge
+          git checkout Backend
+          git pull origin Backend
+          git merge origin/Development --no-edit
           
           # Solo hacer push si hay cambios
-          if ! git diff --quiet HEAD origin/backend; then
-            git push origin backend
-            echo "✅ Branch backend sincronizado exitosamente"
+          if ! git diff --quiet HEAD origin/Backend; then
+            git push origin Backend
+            echo "✅ Branch Backend sincronizado exitosamente"
           else
-            echo "ℹ️ Branch backend ya está actualizado"
+            echo "ℹ️ Branch Backend ya está actualizado"
           fi
         else
-          # El branch backend no existe, crearlo desde development
-          git checkout -b backend origin/development
-          git push origin backend
-          echo "✅ Branch backend creado desde development"
+          # El branch Backend no existe, crearlo desde Development
+          git checkout -b Backend origin/Development
+          git push origin Backend
+          echo "✅ Branch Backend creado desde Development"
         fi
     
-    - name: Sync frontend branch
+    - name: Sync Frontend branch
       run: |
-        echo "Sincronizando branch frontend con development..."
+        echo "Sincronizando branch Frontend con Development..."
         
-        # Verificar si el branch frontend existe
-        if git show-ref --verify --quiet refs/remotes/origin/frontend; then
-          # El branch frontend existe, hacer merge
-          git checkout frontend
-          git pull origin frontend
-          git merge origin/development --no-edit
+        # Verificar si el branch Frontend existe
+        if git show-ref --verify --quiet refs/remotes/origin/Frontend; then
+          # El branch Frontend existe, hacer merge
+          git checkout Frontend
+          git pull origin Frontend
+          git merge origin/Development --no-edit
           
           # Solo hacer push si hay cambios
-          if ! git diff --quiet HEAD origin/frontend; then
-            git push origin frontend
-            echo "✅ Branch frontend sincronizado exitosamente"
+          if ! git diff --quiet HEAD origin/Frontend; then
+            git push origin Frontend
+            echo "✅ Branch Frontend sincronizado exitosamente"
           else
-            echo "ℹ️ Branch frontend ya está actualizado"
+            echo "ℹ️ Branch Frontend ya está actualizado"
           fi
         else
-          # El branch frontend no existe, crearlo desde development
-          git checkout -b frontend origin/development
-          git push origin frontend
-          echo "✅ Branch frontend creado desde development"
+          # El branch Frontend no existe, crearlo desde Development
+          git checkout -b Frontend origin/Development
+          git push origin Frontend
+          echo "✅ Branch Frontend creado desde Development"
         fi
     
     - name: Summary
       run: |
         echo "🎉 Sincronización completada"
         echo "📊 Resumen:"
-        echo "  - Branch development: actualizado"
-        echo "  - Branch backend: sincronizado"
-        echo "  - Branch frontend: sincronizado"
+        echo "  - Branch Development: actualizado"
+        echo "  - Branch Backend: sincronizado"
+        echo "  - Branch Frontend: sincronizado"
         echo "  - Usuario: ${{ needs.check-permissions.outputs.user-name }}"
         echo "  - Fecha: $(date)"
     

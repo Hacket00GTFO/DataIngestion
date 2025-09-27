@@ -16,16 +16,16 @@ const path = require('path');
 // Configuración
 const CONFIG = {
   // Reemplaza con tu información
-  owner: 'tu-usuario-github',        // Tu usuario de GitHub (cambiar por el real)
+  owner: 'NorbertoSuas',        // Tu usuario de GitHub (cambiar por el real)
   repo: 'DataIngestion',             // Nombre de tu repositorio
   token: process.env.GITHUB_TOKEN,   // Token de GitHub (configúralo como variable de entorno)
   
   // Branches a proteger
-  branches: ['development', 'backend', 'frontend'],
+  branches: ['Development', 'Backend', 'Frontend'],
   
   // Configuración de protección
   protection_rules: {
-    development: {
+    Development: {
       required_status_checks: {
         strict: true,
         contexts: ['Sync Child Branches with Development']
@@ -38,7 +38,7 @@ const CONFIG = {
       },
       restrictions: null
     },
-    backend: {
+    Backend: {
       required_status_checks: {
         strict: false,
         contexts: []
@@ -51,7 +51,7 @@ const CONFIG = {
       },
       restrictions: null
     },
-    frontend: {
+    Frontend: {
       required_status_checks: {
         strict: false,
         contexts: []
@@ -154,6 +154,8 @@ async function main() {
   // Verificar conectividad con GitHub
   try {
     console.log('🔍 Verificando conectividad con GitHub...');
+    console.log(`📍 Endpoint: /repos/${CONFIG.owner}/${CONFIG.repo}`);
+    console.log(`🔑 Token configurado: ${CONFIG.token ? 'Sí' : 'No'}`);
     await makeGitHubRequest(`/repos/${CONFIG.owner}/${CONFIG.repo}`);
     console.log('✅ Conexión exitosa con GitHub\n');
   } catch (error) {
