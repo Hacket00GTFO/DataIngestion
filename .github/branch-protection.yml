@@ -1,0 +1,120 @@
+# Configuración de protección de branches y permisos de usuarios
+# Este archivo define quién puede hacer merge en cada branch
+
+branches:
+  development:
+    protection:
+      # Configuración básica
+      required_status_checks:
+        strict: true
+        contexts:
+          - "Sync Child Branches with Development"  # Nuestro workflow
+      
+      enforce_admins: false  # Los admins también deben seguir las reglas
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+        require_last_push_approval: false
+      
+      restrictions:
+        users: []  # Lista de usuarios específicos (vacía = todos los colaboradores)
+        teams: []  # Lista de equipos específicos
+        apps: []   # Listas de apps específicas
+      
+      # Usuarios autorizados para hacer merge en development
+      allowed_mergers:
+        - "branToRep"          # Usuario con permisos de backend
+        - "HilaryCamacho"      # Usuario con permisos de backend
+        - "JaobSandoval"       # Usuario con permisos de frontend
+        - "solmuz"             # Usuario con permisos de frontend
+        # Agrega más usuarios según necesites
+      
+      # Equipos autorizados para hacer merge
+      allowed_teams: []  # Sin equipos específicos configurados
+
+  backend:
+    protection:
+      required_status_checks:
+        strict: false  # Más flexible para branches de desarrollo
+        contexts: []
+      
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 0  # No requiere review para branches de desarrollo
+        dismiss_stale_reviews: false
+        require_code_owner_reviews: false
+        require_last_push_approval: false
+      
+      restrictions:
+        users: []
+        teams: []
+        apps: []
+      
+      # Usuarios autorizados para hacer merge en backend
+      allowed_mergers:
+        - "branToRep"
+        - "HilaryCamacho"
+      
+      allowed_teams: []  # Sin equipos específicos configurados
+
+  frontend:
+    protection:
+      required_status_checks:
+        strict: false
+        contexts: []
+      
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 0
+        dismiss_stale_reviews: false
+        require_code_owner_reviews: false
+        require_last_push_approval: false
+      
+      restrictions:
+        users: []
+        teams: []
+        apps: []
+      
+      # Usuarios autorizados para hacer merge en frontend
+      allowed_mergers:
+        - "JaobSandoval"
+        - "solmuz"
+      
+      allowed_teams: []  # Sin equipos específicos configurados
+
+# Configuración de permisos por roles
+roles:
+  backend_team:
+    description: "Equipo de backend"
+    permissions:
+      - "merge_to_development"
+      - "merge_to_backend"
+    users:
+      - "branToRep"
+      - "HilaryCamacho"
+  
+  frontend_team:
+    description: "Equipo de frontend"
+    permissions:
+      - "merge_to_development"
+      - "merge_to_frontend"
+    users:
+      - "JaobSandoval"
+      - "solmuz"
+
+# Configuración de notificaciones
+notifications:
+  merge_notifications:
+    enabled: true
+    channels:
+      - "slack"  # Si usas Slack
+      - "email"
+      - "github_notifications"
+  
+  sync_notifications:
+    enabled: true
+    notify_on_success: true
+    notify_on_failure: true
+    recipients:
+      - "norberto.suaste@outlook.com"

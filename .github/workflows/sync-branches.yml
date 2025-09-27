@@ -1,0 +1,164 @@
+name: Sync Child Branches with Development
+
+on:
+  push:
+    branches: [ development ]
+  pull_request:
+    types: [ closed ]
+    branches: [ development ]
+  workflow_dispatch:  # Permite ejecución manual
+    inputs:
+      force_sync:
+        description: 'Forzar sincronización incluso si no hay cambios'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write      # Necesario para hacer push a branches
+  pull-requests: read  # Necesario para leer información de PRs
+  actions: read        # Necesario para leer el estado de otros workflows
+
+jobs:
+  # Verificar permisos del usuario
+  check-permissions:
+    runs-on: ubuntu-latest
+    outputs:
+      user-allowed: ${{ steps.check.outputs.allowed }}
+      user-name: ${{ steps.check.outputs.username }}
+    steps:
+    - name: Check user permissions
+      id: check
+      run: |
+        # Lista de usuarios autorizados para hacer merge (edita según necesites)
+        ALLOWED_USERS=("branToRep" "HilaryCamacho" "JaobSandoval" "solmuz")
+        
+        # Obtener el usuario que hizo el push/merge
+        if [ "${{ github.event_name }}" = "push" ]; then
+          USER_NAME="${{ github.actor }}"
+        elif [ "${{ github.event_name }}" = "pull_request" ]; then
+          USER_NAME="${{ github.event.pull_request.user.login }}"
+        else
+          USER_NAME="${{ github.actor }}"
+        fi
+        
+        echo "username=$USER_NAME" >> $GITHUB_OUTPUT
+        
+        # Verificar si el usuario está en la lista de permitidos
+        ALLOWED=false
+        for allowed_user in "${ALLOWED_USERS[@]}"; do
+          if [ "$USER_NAME" = "$allowed_user" ]; then
+            ALLOWED=true
+            break
+          fi
+        done
+        
+        if [ "$ALLOWED" = "true" ]; then
+          echo "✅ Usuario $USER_NAME autorizado para sincronización"
+          echo "allowed=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Usuario $USER_NAME NO autorizado para sincronización"
+          echo "allowed=false" >> $GITHUB_OUTPUT
+        fi
+
+  sync-branches:
+    runs-on: ubuntu-latest
+    needs: check-permissions
+    
+    # Solo ejecutar si el usuario está autorizado y el PR fue merged o es un push
+    if: |
+      needs.check-permissions.outputs.user-allowed == 'true' && 
+      (github.event.pull_request.merged == true || github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    
+    steps:
+    - name: Log sync information
+      run: |
+        echo "🔄 Iniciando sincronización de branches"
+        echo "👤 Usuario autorizado: ${{ needs.check-permissions.outputs.user-name }}"
+        echo "📅 Fecha: $(date)"
+        echo "🌿 Branch trigger: ${{ github.ref_name }}"
+        echo "🔀 Evento: ${{ github.event_name }}"
+        echo "💪 Forzar sync: ${{ inputs.force_sync }}"
+    
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Configure Git
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+    
+    - name: Sync backend branch
+      run: |
+        echo "Sincronizando branch backend con development..."
+        
+        # Verificar si el branch backend existe
+        if git show-ref --verify --quiet refs/remotes/origin/backend; then
+          # El branch backend existe, hacer merge
+          git checkout backend
+          git pull origin backend
+          git merge origin/development --no-edit
+          
+          # Solo hacer push si hay cambios
+          if ! git diff --quiet HEAD origin/backend; then
+            git push origin backend
+            echo "✅ Branch backend sincronizado exitosamente"
+          else
+            echo "ℹ️ Branch backend ya está actualizado"
+          fi
+        else
+          # El branch backend no existe, crearlo desde development
+          git checkout -b backend origin/development
+          git push origin backend
+          echo "✅ Branch backend creado desde development"
+        fi
+    
+    - name: Sync frontend branch
+      run: |
+        echo "Sincronizando branch frontend con development..."
+        
+        # Verificar si el branch frontend existe
+        if git show-ref --verify --quiet refs/remotes/origin/frontend; then
+          # El branch frontend existe, hacer merge
+          git checkout frontend
+          git pull origin frontend
+          git merge origin/development --no-edit
+          
+          # Solo hacer push si hay cambios
+          if ! git diff --quiet HEAD origin/frontend; then
+            git push origin frontend
+            echo "✅ Branch frontend sincronizado exitosamente"
+          else
+            echo "ℹ️ Branch frontend ya está actualizado"
+          fi
+        else
+          # El branch frontend no existe, crearlo desde development
+          git checkout -b frontend origin/development
+          git push origin frontend
+          echo "✅ Branch frontend creado desde development"
+        fi
+    
+    - name: Summary
+      run: |
+        echo "🎉 Sincronización completada"
+        echo "📊 Resumen:"
+        echo "  - Branch development: actualizado"
+        echo "  - Branch backend: sincronizado"
+        echo "  - Branch frontend: sincronizado"
+        echo "  - Usuario: ${{ needs.check-permissions.outputs.user-name }}"
+        echo "  - Fecha: $(date)"
+    
+    - name: Notify on Success
+      if: success()
+      run: |
+        echo "✅ Notificación de éxito enviada a norberto.suaste@outlook.com"
+        echo "📧 Sincronización completada exitosamente por ${{ needs.check-permissions.outputs.user-name }}"
+    
+    - name: Notify on Failure
+      if: failure()
+      run: |
+        echo "❌ Notificación de error enviada a norberto.suaste@outlook.com"
+        echo "🚨 Error en sincronización iniciada por ${{ needs.check-permissions.outputs.user-name }}"

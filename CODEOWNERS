@@ -1,0 +1,31 @@
+# Configuración de propietarios de código
+# Este archivo define quién debe aprobar cambios en diferentes partes del código
+
+# Backend - Solo el equipo de backend puede aprobar
+/backend/ @branToRep @HilaryCamacho
+/app/ @branToRep @HilaryCamacho
+/backend/app/ @branToRep @HilaryCamacho
+
+# Frontend - Solo el equipo de frontend puede aprobar
+/frontend/ @JaobSandoval @solmuz
+/frontend/src/ @JaobSandoval @solmuz
+
+# Configuración de GitHub Actions - Requiere aprobación de todos los usuarios autorizados
+/.github/ @branToRep @HilaryCamacho @JaobSandoval @solmuz
+/.github/workflows/ @branToRep @HilaryCamacho @JaobSandoval @solmuz
+/.github/setup-branch-protection.js @branToRep @HilaryCamacho @JaobSandoval @solmuz
+
+# Configuración de la base de datos - Requiere aprobación de backend team
+/database/ @branToRep @HilaryCamacho
+
+# Documentación - Cualquier usuario autorizado puede aprobar
+/docs/ @branToRep @HilaryCamacho @JaobSandoval @solmuz
+
+# Archivos de configuración del proyecto - Requiere aprobación de todos
+/package.json @branToRep @HilaryCamacho @JaobSandoval @solmuz
+/requirements.txt @branToRep @HilaryCamacho @JaobSandoval @solmuz
+/pyproject.toml @branToRep @HilaryCamacho @JaobSandoval @solmuz
+
+# README y documentación principal - Cualquier usuario autorizado
+README.md @branToRep @HilaryCamacho @JaobSandoval @solmuz
+*.md @branToRep @HilaryCamacho @JaobSandoval @solmuz
