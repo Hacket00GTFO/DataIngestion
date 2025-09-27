@@ -24,8 +24,11 @@ branches:
       
       # Usuarios autorizados para hacer merge en development
       allowed_mergers:
-        - "NorbertoSuas"       # Solo el administrador puede hacer merge directo
-        # Los demás usuarios deben hacer PR desde sus branches específicos
+        - "branToRep"          # Usuario con permisos de backend
+        - "HilaryCamacho"      # Usuario con permisos de backend
+        - "JaobSandoval"       # Usuario con permisos de frontend
+        - "solmuz"             # Usuario con permisos de frontend
+        # Agrega más usuarios según necesites
       
       # Equipos autorizados para hacer merge
       allowed_teams: []  # Sin equipos específicos configurados
