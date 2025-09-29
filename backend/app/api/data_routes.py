@@ -9,7 +9,7 @@ from typing import Any, Dict
 import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
-
+from app.models.data_models import DataIngestionRequest, DataProcessingResponse
 from app.services.data_service import DataService
 
 LOGGER = logging.getLogger(__name__)
@@ -17,6 +17,14 @@ LOGGER = logging.getLogger(__name__)
 router = APIRouter()
 data_service = DataService()
 
+@router.post("/data/ingest", response_model=DataProcessingResponse)
+async def ingest_data(request: DataIngestionRequest):
+    """Endpoint para ingesta de nuevos datos."""
+    try:
+        result = await data_service.ingest_data(request.data)
+        return DataProcessingResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.post("/data/upload-excel")
 async def upload_excel(file: UploadFile = File(...)) -> Dict[str, Any]:
@@ -25,6 +33,10 @@ async def upload_excel(file: UploadFile = File(...)) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="Nombre de archivo inválido")
 
     try:
+        # Verificar que el archivo es Excel o CSV
+        if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
+            raise HTTPException(status_code=400, detail="El archivo debe ser un Excel (.xlsx o .xls) o CSV")
+        
         with TemporaryDirectory() as tmpdir:
             temp_input = Path(tmpdir) / file.filename
             temp_input.write_bytes(await file.read())
@@ -51,7 +63,6 @@ async def upload_excel(file: UploadFile = File(...)) -> Dict[str, Any]:
         LOGGER.exception("Error procesando archivo de datos")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-
 @router.get("/data/statistics")
 async def get_statistics() -> Dict[str, Any]:
     """Return aggregated metrics for the tiros dataset."""
@@ -62,6 +73,20 @@ async def get_statistics() -> Dict[str, Any]:
         LOGGER.exception("Error obteniendo estadisticas")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
+@router.get("/data")
+async def get_data():
+    """Endpoint para obtener los datos almacenados."""
+    try:
+        # Obtener datos de la base de datos
+        records = await data_service.db_service.get_data_records()
+        data = [record.data for record in records if record.data]
+        return {
+            "data": data,
+            "total_records": len(data),
+            "message": f"Se encontraron {len(data)} registros en la base de datos"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.get("/data/schema")
 async def get_schema() -> Dict[str, Any]:

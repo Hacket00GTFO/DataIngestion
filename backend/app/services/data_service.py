@@ -84,7 +84,6 @@ COLUMN_ALIASES = {
     "calibre_de_balon": "calibre_de_balon",
 }
 
-
 class DataService:
     """Service encapsulating persistence and transformation logic."""
 
@@ -204,7 +203,6 @@ class DataService:
         """Remove all rows from staging."""
         with session_scope() as session:
             session.execute(sa.text("TRUNCATE TABLE public.tiros_staging RESTART IDENTITY"))
-
     def get_statistics(self) -> Dict[str, Any]:
         """Aggregate metrics from the tiros table."""
         with session_scope() as session:
