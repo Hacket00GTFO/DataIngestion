@@ -5,6 +5,7 @@ import pandas as pd
 from app.models.data_models import DataStatistics
 from app.utils.data_validator import DataValidator
 from app.utils.data_processor import DataProcessor
+from app.services.database_service import DatabaseService
 
 class DataService:
     """Servicio principal para el procesamiento de datos"""
@@ -12,6 +13,7 @@ class DataService:
     def __init__(self):
         self.validator = DataValidator()
         self.processor = DataProcessor()
+        self.db_service = DatabaseService()
 
     async def process_excel_data(self, file_path: str) -> DataStatistics:
         """Procesa datos desde archivo Excel."""
@@ -19,22 +21,72 @@ class DataService:
             # Leer archivo Excel
             df = pd.read_excel(file_path)
 
-            # Validar datos
-            validation_result = self.validator.validate_dataframe(df)
+            # Si es el archivo de evidencia, procesar con estructura específica
+            if "evidencia big data" in file_path.lower():
+                # Los nombres de columnas están en la primera fila
+                column_names = df.iloc[0].tolist()
 
-            # Procesar datos si son válidos
-            if validation_result.is_valid:
-                processed_data = self.processor.clean_data(df)
+                # Crear nuevo DataFrame con nombres de columnas correctos
+                df_processed = df.iloc[1:].copy()  # Saltar la primera fila (nombres)
+                df_processed.columns = column_names
+
+                # Limpiar datos
+                df_processed = df_processed.dropna(how='all')  # Eliminar filas completamente vacías
+
+                # Procesar datos
+                processed_data = self.processor.clean_data(df_processed)
                 stats = self._calculate_statistics(processed_data)
+
+                # Guardar datos procesados para uso posterior
+                self._save_processed_data(processed_data)
+
             else:
-                stats = self._calculate_statistics(df)
-                stats.valid_records = 0
-                stats.invalid_records = len(df)
+                # Procesamiento estándar para otros archivos
+                validation_result = self.validator.validate_dataframe(df)
+
+                if validation_result.is_valid:
+                    processed_data = self.processor.clean_data(df)
+                    stats = self._calculate_statistics(processed_data)
+                else:
+                    stats = self._calculate_statistics(df)
+                    stats.valid_records = 0
+                    stats.invalid_records = len(df)
 
             return stats
 
         except Exception as e:
             raise ValueError(f"Error procesando archivo Excel: {str(e)}") from e
+
+    def _save_processed_data(self, df: pd.DataFrame):
+        """Guarda los datos procesados para uso posterior."""
+        try:
+            # Guardar en un archivo temporal o en memoria para uso posterior
+            df.to_csv("processed_data.csv", index=False)
+            logging.info("Datos procesados guardados: %d registros", len(df))
+        except (OSError, IOError) as e:
+            logging.error("Error guardando datos procesados: %s", str(e))
+
+    async def get_processed_data(self) -> List[Dict]:
+        """Obtiene los datos procesados del archivo Excel."""
+        try:
+            # Intentar cargar datos procesados
+            df = pd.read_csv("processed_data.csv")
+            return df.to_dict('records')
+        except FileNotFoundError:
+            # Si no hay datos procesados, procesar el archivo original
+            excel_path = "../evidencia big data.xlsx"
+            df = pd.read_excel(excel_path)
+
+            # Procesar con la estructura correcta
+            column_names = df.iloc[0].tolist()
+            df_processed = df.iloc[1:].copy()
+            df_processed.columns = column_names
+            df_processed = df_processed.dropna(how='all')
+
+            return df_processed.to_dict('records')
+        except (pd.errors.EmptyDataError, pd.errors.ParserError) as e:
+            logging.error("Error obteniendo datos procesados: %s", str(e))
+            return []
 
     async def ingest_data(self, data: List[Dict]) -> Dict:
         """Ingesta nuevos registros de datos."""
@@ -55,8 +107,8 @@ class DataService:
             # Procesar datos
             processed_data = self.processor.clean_data(df)
 
-            # Aquí se guardaría en base de datos
-            # await self._save_to_database(processed_data)
+            # Guardar en base de datos
+            await self.db_service.save_data_records(processed_data.to_dict('records'), "api_ingestion")
 
             return {
                 "success": True,
@@ -73,12 +125,93 @@ class DataService:
             }
         except Exception as e:
             # Log the full exception for debugging
-            logging.error(f"Unexpected error in data ingestion: {str(e)}", exc_info=True)
+            logging.error("Unexpected error in data ingestion: %s", str(e), exc_info=True)
             return {
                 "success": False,
                 "message": "Error inesperado en ingesta",
                 "errors": [f"Error interno: {str(e)}"]
             }
+
+    async def analyze_excel_schema(self) -> List[Dict]:
+        """Analiza el archivo Excel para extraer el esquema de columnas."""
+        try:
+            # Ruta del archivo Excel
+            excel_path = "../evidencia big data.xlsx"
+
+            # Leer el archivo Excel
+            df = pd.read_excel(excel_path)
+
+            # Los nombres de las columnas están en la primera fila
+            # Necesitamos extraer los nombres reales de las columnas
+            column_names = df.iloc[0].tolist()  # Primera fila contiene los nombres
+
+            # Crear esquema de columnas
+            schema = []
+            for i, col_name in enumerate(column_names):
+                if pd.notna(col_name) and str(col_name).strip():  # Solo columnas con nombre válido
+                    # Determinar el tipo de dato basado en los datos de la columna
+                    col_data = df.iloc[1:, i].dropna()  # Datos sin la fila de encabezados
+
+                    # Inferir tipo de dato
+                    data_type = self._infer_data_type(col_data)
+
+                    # Determinar si es requerido (no puede estar vacío)
+                    is_required = bool(not col_data.empty and col_data.isna().sum() == 0)
+
+                    schema.append({
+                        "name": str(col_name).strip(),
+                        "type": data_type,
+                        "required": is_required,
+                        "description": f"Columna {i+1} del archivo Excel"
+                    })
+
+            return schema
+
+        except (FileNotFoundError, pd.errors.EmptyDataError, pd.errors.ParserError) as e:
+            logging.error("Error analizando esquema del Excel: %s", str(e))
+            # Retornar esquema por defecto si hay error
+            return [
+                {"name": "columna1", "type": "string", "required": True, "description": "Columna 1"},
+                {"name": "columna2", "type": "string", "required": False, "description": "Columna 2"}
+            ]
+
+    def _infer_data_type(self, data_series: pd.Series) -> str:
+        """Infiere el tipo de dato de una serie de pandas."""
+        if data_series.empty:
+            return "string"
+
+        # Limpiar datos para análisis
+        clean_series = data_series.dropna().astype(str).str.strip()
+
+        # Verificar si son valores booleanos
+        if clean_series.isin(['True', 'False', 'true', 'false', '1', '0', 'Sí', 'No', 'sí', 'no']).all():
+            return "boolean"
+
+        # Intentar convertir a numérico
+        try:
+            numeric_series = pd.to_numeric(clean_series, errors='raise')
+            # Verificar si son enteros
+            if numeric_series.apply(lambda x: x.is_integer()).all():
+                return "integer"
+            else:
+                return "number"
+        except (ValueError, TypeError):
+            pass
+
+        # Verificar si son fechas (formato más estricto)
+        try:
+            # Solo intentar con formatos comunes
+            pd.to_datetime(clean_series, format='%Y-%m-%d', errors='raise')
+            return "date"
+        except (ValueError, TypeError):
+            try:
+                pd.to_datetime(clean_series, format='%d/%m/%Y', errors='raise')
+                return "date"
+            except (ValueError, TypeError):
+                pass
+
+        # Por defecto, string
+        return "string"
 
     def _calculate_statistics(self, df: pd.DataFrame) -> DataStatistics:
         """Calcula estadísticas de los datos."""

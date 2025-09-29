@@ -3,15 +3,17 @@ import { useDataIngestion } from '../services/DataIngestionContext';
 import './DataForm.css';
 
 const DataForm = () => {
-  const { ingestData, getSchema } = useDataIngestion();
+  const { ingestData, getSchema, getData } = useDataIngestion();
   const [formData, setFormData] = useState([]);
   const [schema, setSchema] = useState([]);
+  const [existingData, setExistingData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
 
   useEffect(() => {
     loadSchema();
+    loadExistingData();
   }, []);
 
   const loadSchema = async () => {
@@ -22,6 +24,15 @@ const DataForm = () => {
     } catch (error) {
       setMessage('Error cargando esquema de datos');
       setMessageType('error');
+    }
+  };
+
+  const loadExistingData = async () => {
+    try {
+      const dataResponse = await getData();
+      setExistingData(dataResponse.data || []);
+    } catch (error) {
+      console.error('Error cargando datos existentes:', error);
     }
   };
 
@@ -94,8 +105,12 @@ const DataForm = () => {
       const result = await response.json();
       
       if (result.success) {
-        setMessage('Archivo procesado exitosamente');
+        setMessage('Archivo procesado exitosamente. Recargando datos...');
         setMessageType('success');
+        
+        // Recargar el esquema y datos después de procesar el archivo
+        await loadSchema();
+        await loadExistingData();
       } else {
         setMessage('Error procesando archivo');
         setMessageType('error');
@@ -119,6 +134,44 @@ const DataForm = () => {
             {message}
           </div>
         )}
+
+        <div className="form-section">
+          <h3>Datos del Archivo Excel</h3>
+          {existingData.length > 0 ? (
+            <div className="data-preview">
+              <p>Se encontraron {existingData.length} registros en el archivo Excel:</p>
+              <div className="data-table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      {schema.map((column) => (
+                        <th key={column.name}>{column.name}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {existingData.slice(0, 5).map((record, index) => (
+                      <tr key={index}>
+                        {schema.map((column) => (
+                          <td key={column.name}>
+                            {record[column.name] || '-'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {existingData.length > 5 && (
+                  <p className="data-more">
+                    ... y {existingData.length - 5} registros más
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p>No hay datos cargados del archivo Excel aún.</p>
+          )}
+        </div>
 
         <div className="form-section">
           <h3>Subir Archivo Excel</h3>
@@ -170,14 +223,25 @@ const DataForm = () => {
                       <label className="form-label">
                         {column.name}
                         {column.required && <span className="required">*</span>}
+                        {column.description && (
+                          <span className="field-description"> - {column.description}</span>
+                        )}
                       </label>
                       <input
-                        type={column.type === 'number' ? 'number' : 'text'}
+                        type={column.type === 'number' || column.type === 'integer' ? 'number' : 
+                              column.type === 'date' ? 'date' : 
+                              column.type === 'boolean' ? 'checkbox' : 'text'}
                         className="form-input"
                         value={record[column.name] || ''}
-                        onChange={(e) => updateRecord(recordIndex, column.name, e.target.value)}
+                        onChange={(e) => updateRecord(recordIndex, column.name, 
+                          column.type === 'boolean' ? e.target.checked : e.target.value)}
                         required={column.required}
+                        placeholder={`Ingrese ${column.name.toLowerCase()}`}
+                        checked={column.type === 'boolean' ? record[column.name] === true : undefined}
                       />
+                      <small className="field-type">
+                        Tipo: {column.type} {column.required ? '(Requerido)' : '(Opcional)'}
+                      </small>
                     </div>
                   ))}
                 </div>

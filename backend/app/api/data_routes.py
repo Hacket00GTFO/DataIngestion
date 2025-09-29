@@ -1,5 +1,4 @@
 """API routes for data management endpoints."""
-import os
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.models.data_models import DataIngestionRequest, DataProcessingResponse
 from app.services.data_service import DataService
@@ -20,35 +19,59 @@ async def ingest_data(request: DataIngestionRequest):
 async def upload_excel(file: UploadFile = File(...)):
     """Endpoint para subir y procesar archivo Excel."""
     try:
-        # Guardar archivo temporalmente
-        file_path = f"temp_{file.filename}"
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-
-        # Procesar archivo
-        stats = await data_service.process_excel_data(file_path)
-
-        # Limpiar archivo temporal
-        os.remove(file_path)
-
-        return {
-            "success": True,
-            "message": "Archivo procesado exitosamente",
-            "statistics": stats.dict()
-        }
+        # Verificar que el archivo es Excel
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            raise HTTPException(status_code=400, detail="El archivo debe ser un Excel (.xlsx o .xls)")
+        
+        # Leer contenido del archivo
+        file_content = await file.read()
+        
+        # Procesar datos del Excel usando la función de excel_routes
+        from app.api.excel_routes import process_excel_data
+        records = process_excel_data(file_content)
+        
+        if not records:
+            raise HTTPException(status_code=400, detail="No se encontraron datos válidos en el archivo Excel")
+        
+        # Guardar en base de datos
+        success = await data_service.db_service.save_data_records(records, source="excel_upload")
+        
+        if success:
+            return {
+                "success": True,
+                "message": f"Se procesaron {len(records)} registros del archivo Excel exitosamente",
+                "processed_records": len(records),
+                "data": records
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Error guardando datos en la base de datos")
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}") from e
 
 @router.get("/data/statistics")
 async def get_data_statistics():
     """Endpoint para obtener estadísticas de los datos."""
     try:
-        # Aquí se obtendrían estadísticas de la base de datos
+        # Obtener estadísticas de la base de datos
+        stats = await data_service.db_service.get_statistics()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+@router.get("/data")
+async def get_data():
+    """Endpoint para obtener los datos almacenados."""
+    try:
+        # Obtener datos de la base de datos
+        records = await data_service.db_service.get_data_records()
+        data = [record.data for record in records if record.data]
         return {
-            "total_records": 0,
-            "last_updated": None,
-            "data_sources": []
+            "data": data,
+            "total_records": len(data),
+            "message": f"Se encontraron {len(data)} registros en la base de datos"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -57,13 +80,31 @@ async def get_data_statistics():
 async def get_data_schema():
     """Endpoint para obtener el esquema de datos."""
     try:
-        # Aquí se retornaría el esquema basado en el Excel
-        return {
-            "columns": [
-                {"name": "columna1", "type": "string", "required": True},
-                {"name": "columna2", "type": "number", "required": False},
-                # Se definirían según el Excel real
-            ]
-        }
+        # Obtener datos de la base de datos para analizar el esquema
+        records = await data_service.db_service.get_data_records(limit=1)
+        if records and records[0].data:
+            # Analizar el primer registro para obtener el esquema
+            sample_data = records[0].data
+            schema = []
+            for key, value in sample_data.items():
+                # Inferir tipo de dato
+                if isinstance(value, bool):
+                    data_type = "boolean"
+                elif isinstance(value, (int, float)):
+                    data_type = "number"
+                else:
+                    data_type = "string"
+                
+                schema.append({
+                    "name": key,
+                    "type": data_type,
+                    "required": True,
+                    "description": f"Campo {key} del archivo Excel"
+                })
+            return {"columns": schema}
+        else:
+            # Si no hay datos, usar esquema por defecto del archivo Excel
+            schema = await data_service.analyze_excel_schema()
+            return {"columns": schema}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e

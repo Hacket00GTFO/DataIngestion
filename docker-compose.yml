@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Azure SQL Server
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: data-ingestion-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - data-ingestion-network
+    restart: unless-stopped
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: data-ingestion-backend
+    environment:
+      - DATABASE_URL=mssql+pyodbc://sa:YourStrong@Passw0rd@sqlserver:1433/DataIngestionDB?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes
+      - SQL_SERVER_HOST=sqlserver
+      - SQL_SERVER_PORT=1433
+      - SQL_SERVER_DATABASE=DataIngestionDB
+      - SQL_SERVER_USERNAME=sa
+      - SQL_SERVER_PASSWORD=YourStrong@Passw0rd
+    ports:
+      - "8000:8000"
+    depends_on:
+      - sqlserver
+    networks:
+      - data-ingestion-network
+    restart: unless-stopped
+    volumes:
+      - ./evidencia big data.xlsx:/app/evidencia big data.xlsx:ro
+
+  # Frontend (opcional, si quieres incluir el frontend en Docker)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: data-ingestion-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - data-ingestion-network
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:
+
+networks:
+  data-ingestion-network:
+    driver: bridge

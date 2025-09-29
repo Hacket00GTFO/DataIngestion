@@ -1,100 +1,107 @@
-# Data Ingestion Backend
+# Backend API - Data Ingestion
 
-Backend API para el sistema de procesamiento y gestión de datos de evidencia big data.
+API REST para procesamiento de datos del archivo `evidencia big data.xlsx` con FastAPI y SQL Server.
 
-## Estructura del Proyecto
+## Estructura
 
 ```
 backend/
 ├── app/
-│   ├── __init__.py
 │   ├── main.py                 # Aplicación principal FastAPI
+│   ├── database.py             # Configuración de SQL Server
 │   ├── api/
-│   │   ├── __init__.py
-│   │   ├── data_routes.py      # Rutas para gestión de datos
-│   │   └── health_routes.py    # Rutas de health check
+│   │   ├── data_routes.py      # Rutas de datos
+│   │   ├── excel_routes.py     # Rutas de Excel
+│   │   ├── health_routes.py    # Health check
+│   │   └── database_routes.py  # Rutas de BD
 │   ├── models/
-│   │   ├── __init__.py
-│   │   └── data_models.py      # Modelos de datos Pydantic
+│   │   └── data_models.py      # Modelos SQLAlchemy + Pydantic
 │   ├── services/
-│   │   ├── __init__.py
-│   │   └── data_service.py     # Servicio principal de datos
+│   │   ├── data_service.py     # Servicio principal
+│   │   └── database_service.py # Servicio de BD
 │   └── utils/
-│       ├── __init__.py
-│       ├── data_processor.py   # Utilidades de procesamiento
-│       └── data_validator.py   # Utilidades de validación
-├── requirements.txt
-├── run.py                      # Script para ejecutar la aplicación
-├── .pylintrc                   # Configuración de Pylint
-└── pyproject.toml              # Configuración del proyecto
+│       ├── data_processor.py   # Procesamiento de datos
+│       └── data_validator.py   # Validación
+├── requirements.txt            # Dependencias
+├── Dockerfile                  # Imagen Docker
+└── run.py                      # Script de ejecución
 ```
 
 ## Instalación
 
-1. Asegúrate de tener Python 3.12+ instalado
-2. Instala las dependencias:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Prerrequisitos
+- Python 3.8+
+- SQL Server (Docker recomendado)
 
-## Ejecución
-
-### Opción 1: Usando el script run.py
+### Instalación Local
 ```bash
-python run.py
-```
+# Instalar dependencias
+pip install -r requirements.txt
 
-### Opción 2: Usando uvicorn directamente
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Opción 3: Usando el módulo Python
-```bash
+# Ejecutar servidor
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Endpoints Disponibles
+### Con Docker
+```bash
+# Desde la raíz del proyecto
+start.bat
 
-- `GET /` - Información general de la API
-- `GET /api/v1/health` - Health check básico
-- `GET /api/v1/health/detailed` - Health check detallado
-- `POST /api/v1/data/ingest` - Ingesta de nuevos datos
-- `POST /api/v1/data/upload-excel` - Subida y procesamiento de archivos Excel
-- `GET /api/v1/data/statistics` - Estadísticas de los datos
-- `GET /api/v1/data/schema` - Esquema de datos
+# O solo el backend
+docker-compose up backend -d
+```
 
-## Documentación de la API
+## Dependencias Principales
+- **FastAPI** - Framework web
+- **SQLAlchemy** - ORM para base de datos
+- **pyodbc** - Conector para SQL Server
+- **Pandas** - Procesamiento de Excel
+- **Pydantic** - Validación de datos
 
-Una vez que la aplicación esté ejecutándose, puedes acceder a:
-- Documentación interactiva: http://localhost:8000/docs
-- Documentación alternativa: http://localhost:8000/redoc
+## Endpoints Principales
+
+### Datos
+- `POST /api/v1/data/ingest` - Ingesta manual de datos
+- `POST /api/v1/data/upload-excel` - Carga de archivo Excel
+- `GET /api/v1/data` - Obtener todos los datos
+- `GET /api/v1/data/schema` - Esquema de columnas
+- `GET /api/v1/data/statistics` - Estadísticas
+
+### Base de Datos
+- `GET /api/v1/database/records` - Registros de BD
+- `GET /api/v1/database/statistics` - Estadísticas de BD
+- `POST /api/v1/database/query` - Consultas personalizadas
+
+### Salud
+- `GET /api/v1/health` - Health check
+
+## Documentación API
+
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+## Configuración
+
+### Variables de Entorno
+```bash
+DATABASE_URL=mssql+pyodbc://sa:YourStrong@Passw0rd@localhost:1433/DataIngestionDB?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes
+```
+
+### Conexión a Base de Datos
+- **Server**: localhost,1433
+- **Username**: sa
+- **Password**: YourStrong@Passw0rd
+- **Database**: DataIngestionDB
 
 ## Desarrollo
 
-### Configuración del IDE
-
-El proyecto incluye configuración para varios linters y IDEs:
-
-- `.pylintrc` - Configuración de Pylint
-- `pyproject.toml` - Configuración moderna del proyecto
-- `pyrightconfig.json` - Configuración para Pyright (VS Code)
-- `.vscode/settings.json` - Configuración específica de VS Code
-
-### Configuración del Linter
-
-Si estás viendo errores de importación en tu IDE, asegúrate de:
-
-1. **Abrir el proyecto desde la carpeta `backend`** (no desde la raíz del repositorio)
-2. **Configurar el intérprete de Python** para usar el entorno virtual en `./venv/Scripts/python.exe`
-3. **Reiniciar el servidor de lenguaje** de Python en tu IDE
+### Configuración IDE
+- Abrir proyecto desde carpeta `backend`
+- Configurar intérprete Python en `./venv/Scripts/python.exe`
+- Reiniciar servidor de lenguaje Python
 
 ### Estructura de Imports
-
-Todos los imports usan rutas absolutas desde el paquete `app`. Por ejemplo:
 ```python
 from app.models.data_models import DataStatistics
 from app.services.data_service import DataService
 ```
-
-Esto asegura que los imports funcionen correctamente independientemente del directorio desde donde se ejecute el código.

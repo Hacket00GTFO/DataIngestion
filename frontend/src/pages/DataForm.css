@@ -70,6 +70,69 @@
   margin-left: 4px;
 }
 
+.field-description {
+  color: #6c757d;
+  font-weight: normal;
+  font-size: 0.9em;
+}
+
+.field-type {
+  display: block;
+  color: #6c757d;
+  font-size: 0.8em;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.data-preview {
+  margin-bottom: 20px;
+}
+
+.data-table-container {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.data-table th {
+  background-color: #f8f9fa;
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #dee2e6;
+  font-size: 0.9em;
+}
+
+.data-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #dee2e6;
+  font-size: 0.9em;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+.data-more {
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+  margin-top: 10px;
+}
+
 .form-actions {
   margin-top: 30px;
   padding-top: 20px;
