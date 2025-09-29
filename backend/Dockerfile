@@ -1,6 +1,11 @@
 FROM python:3.12-slim
 
-# Instalar dependencias del sistema para SQL Server
+# Metadatos del contenedor
+LABEL maintainer="Data Ingestion API"
+LABEL description="Backend API para procesamiento de datos Excel con 14 columnas"
+LABEL version="1.0.0"
+
+# Instalar dependencias del sistema para SQL Server y herramientas adicionales
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
@@ -25,11 +30,24 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código de la aplicación
 COPY . .
 
-# Crear directorio para datos
-RUN mkdir -p /app/data
+# Crear directorio para datos y logs
+RUN mkdir -p /app/data /app/logs
+
+# Crear usuario no-root para seguridad
+RUN useradd --create-home --shell /bin/bash app \
+    && chown -R app:app /app
+USER app
 
 # Exponer puerto
 EXPOSE 8000
 
-# Comando para ejecutar la aplicación
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Healthcheck para verificar que la API está funcionando
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+
+# Variables de entorno por defecto
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Comando para ejecutar la aplicación (sin reload en producción)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

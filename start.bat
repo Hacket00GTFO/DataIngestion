@@ -1,36 +1,44 @@
 @echo off
-echo Iniciando Data Ingestion con Azure SQL Server...
+echo ====================================
+echo   Data Ingestion - Database Only
+echo ====================================
 echo.
 
 REM Verificar si Docker está ejecutándose
 docker info >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Error: Docker no está ejecutándose. Por favor, inicia Docker Desktop.
+    echo ERROR: Docker no está ejecutándose. Por favor inicia Docker Desktop.
     pause
     exit /b 1
 )
 
-echo Construyendo e iniciando contenedores...
-docker-compose up --build -d
+echo [1/2] Deteniendo contenedores existentes...
+docker-compose down 2>nul
+
+echo [2/2] Iniciando base de datos...
+docker-compose up -d
 
 echo.
-echo Esperando a que los servicios estén listos...
-timeout /t 30 /nobreak >nul
+echo Esperando que SQL Server esté listo...
+timeout /t 15 /nobreak >nul
 
 echo.
-echo Verificando estado de los contenedores...
-docker-compose ps
-
+echo ====================================
+echo   Base de datos iniciada
+echo ====================================
 echo.
-echo ========================================
-echo Servicios iniciados:
-echo - Azure SQL Server: localhost:1433
-echo - Backend API: http://localhost:8000
-echo - Frontend: http://localhost:3000
-echo - Azure Data Studio: Configurar conexión a localhost:1433
-echo ========================================
+echo SQL Server disponible en: localhost:1433
+echo Usuario: sa
+echo Password: YourStrong@Passw0rd
 echo.
-echo Para detener los servicios, ejecuta: docker-compose down
-echo Para ver logs: docker-compose logs -f
+echo Para iniciar backend: 
+echo   cd backend
+echo   pip install -r requirements.txt
+echo   python -m uvicorn app.main:app --reload
+echo.
+echo Para iniciar frontend:
+echo   cd frontend  
+echo   npm install
+echo   npm start
 echo.
 pause

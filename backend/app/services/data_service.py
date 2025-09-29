@@ -1,358 +1,232 @@
-"""Data service providing ETL helpers for tiros records."""
-from __future__ import annotations
-
+"""Data service providing core data processing functionality."""
 import logging
-import unicodedata
-from decimal import Decimal, ROUND_HALF_UP
-from pathlib import Path
-from typing import Any, Dict, List
-
 import pandas as pd
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import TEXT
-from sqlalchemy.exc import SQLAlchemyError
+from typing import Dict, List, Any
+from app.utils.data_processor import DataProcessor
+from app.utils.data_validator import DataValidator
+from app.models.data_models import DataProcessingStatistics
+from app.services.database_service import DatabaseService
 
-from app.db import engine, session_scope
-from app.models.tiro import Tiro
-from app.utils.data_processor import (
-    normalize_genero,
-    normalize_mano_habil,
-    parse_anios,
-    parse_exitos_intentos,
-    parse_grados,
-    parse_metros,
-    parse_peso_g,
-    parse_peso_kg,
-    parse_segundos,
-)
-
-LOGGER = logging.getLogger(__name__)
-LOGGER.setLevel(logging.DEBUG)
-
-STAGING_COLUMNS = [
-    "nombre_tirador",
-    "edad",
-    "experiencia",
-    "distancia_de_tiro",
-    "angulo",
-    "altura_de_tirador",
-    "peso",
-    "ambiente",
-    "genero",
-    "peso_del_balon",
-    "tiempo_de_tiro",
-    "tiro_exitoso",
-    "diestro_zurdo",
-    "calibre_de_balon",
-]
-
-
-metadata = sa.MetaData(schema="public")
-TIROS_STAGING = sa.Table(
-    "tiros_staging",
-    metadata,
-    sa.Column("id", sa.BigInteger, primary_key=True),
-    *(sa.Column(column, TEXT) for column in STAGING_COLUMNS),
-)
-
-COLUMN_ALIASES = {
-    "nombre tirador": "nombre_tirador",
-    "nombre_tirador": "nombre_tirador",
-    "edad": "edad",
-    "experiencia": "experiencia",
-    "experiencia laboral": "experiencia",
-    "distancia de tiro": "distancia_de_tiro",
-    "distancia_de_tiro": "distancia_de_tiro",
-    "angulo": "angulo",
-    "ángulo": "angulo",
-    "altura de tirador": "altura_de_tirador",
-    "altura_de_tirador": "altura_de_tirador",
-    "peso": "peso",
-    "ambiente": "ambiente",
-    "genero": "genero",
-    "género": "genero",
-    "peso del balon": "peso_del_balon",
-    "peso_del_balon": "peso_del_balon",
-    "tiempo de tiro": "tiempo_de_tiro",
-    "tiempo_de_tiro": "tiempo_de_tiro",
-    "tiro exitoso?": "tiro_exitoso",
-    "tiro exitoso": "tiro_exitoso",
-    "diestro / zurdo": "diestro_zurdo",
-    "diestro/zurdo": "diestro_zurdo",
-    "diestro_zurdo": "diestro_zurdo",
-    "calibre de balon": "calibre_de_balon",
-    "calibre_de_balon": "calibre_de_balon",
-}
+logger = logging.getLogger(__name__)
 
 class DataService:
-    """Service encapsulating persistence and transformation logic."""
+    """Service for data processing and management."""
+    
+    def __init__(self):
+        self.processor = DataProcessor()
+        self.validator = DataValidator()
+        self.db_service = DatabaseService()
 
-    def __init__(self) -> None:
-        self.engine = engine
-
-    # -----------------------------
-    # Staging loading
-    # -----------------------------
-    def load_csv_to_staging(self, file_path: str) -> int:
-        """Load a CSV file into the staging table.
-
-        Returns the number of rows ingested.
+    async def process_excel_file(self, file_path: str) -> DataProcessingStatistics:
         """
-        csv_path = Path(file_path)
-        if not csv_path.exists():
-            raise FileNotFoundError(f"Archivo no encontrado: {csv_path}")
-
-        read_kwargs = {"dtype": str, "keep_default_na": False, "engine": "python", "sep": None}
-        encodings = ["utf-8", "latin-1", "cp1252"]
-        df = None
-        last_error: Exception | None = None
-        for encoding in encodings:
-            try:
-                df = pd.read_csv(csv_path, encoding=encoding, **read_kwargs)
-                if encoding != "utf-8":
-                    LOGGER.info("Loaded CSV %s using fallback encoding %s", csv_path, encoding)
-                break
-            except UnicodeDecodeError as exc:
-                last_error = exc
-                continue
-
-        if df is None:
-            raise UnicodeDecodeError(
-                "csv", b"", 0, 0, f"No se pudo decodificar el archivo {csv_path}: {last_error}"
-            )
-        if df.empty:
-            LOGGER.info("No rows found in %s", csv_path)
-            return 0
-
-        LOGGER.info("Column headers before cleaning: %s", df.columns.tolist())
-        df.rename(columns=self._clean_column_header, inplace=True)
-        LOGGER.info("Column headers after cleaning: %s", df.columns.tolist())
-        df = self._rename_columns(df)
-        LOGGER.info("Column headers after alias mapping: %s", df.columns.tolist())
-        strip_cell = lambda value: value.strip() if isinstance(value, str) else value
-        if hasattr(df, "map"):
-            df = df.map(strip_cell)
-        else:
-            df = df.applymap(strip_cell)
-        df = df.replace({"": None})
-
-        missing = [col for col in STAGING_COLUMNS if col not in df.columns]
-        if missing:
-            for column in missing:
-                df[column] = None
-            LOGGER.warning("CSV missing expected columns: %s", ", ".join(missing))
-
-        df = df[STAGING_COLUMNS]
-
-        try:
-            df.to_sql(
-                "tiros_staging",
-                con=self.engine,
-                schema="public",
-                if_exists="append",
-                index=False,
-                method="multi",
-            )
-        except SQLAlchemyError as exc:
-            LOGGER.error("Error loading CSV into staging: %s", exc)
-            raise
-
-        return len(df)
-
-    # -----------------------------
-    # Transformation
-    # -----------------------------
-    def transform_staging_to_final(self) -> Dict[str, Any]:
-        """Transform staging rows into the final table.
-
-        Returns a dictionary with counts and details about invalid rows.
+        Procesa un archivo Excel específico para el proyecto.
+        
+        Args:
+            file_path: Ruta al archivo Excel
+            
+        Returns:
+            DataProcessingStatistics con métricas del procesamiento
         """
-        with session_scope() as session:
-            rows = session.execute(sa.select(TIROS_STAGING)).mappings().all()
+        try:
+            # Cargar archivo Excel
+            df = pd.read_excel(file_path)
+            logger.info("Archivo Excel cargado: %d filas, %d columnas", len(df), len(df.columns))
 
-        total_rows = len(rows)
-        valid_payload: List[Dict[str, Any]] = []
-        invalid_rows: List[Dict[str, Any]] = []
-
-        for raw in rows:
-            try:
-                valid_payload.append(self._transform_row(raw))
-            except Exception as exc:  # pylint: disable=broad-except
-                invalid_info = {
-                    "staging_id": raw.get("id"),
-                    "error": str(exc),
-                    "row": {key: raw.get(key) for key in STAGING_COLUMNS},
+            # Verificar si es el archivo específico de evidencia big data
+            expected_columns = [
+                'Nombre tirador', 'Edad', 'Experiencia', 'Distancia de tiro', 
+                'Angulo', 'Altura de tirador', 'Peso', 'Ambiente', 'Genero',
+                'Peso del balon', 'Tiempo de tiro', 'Tiro exitoso?',
+                'Diestro / Zurdo', 'Calibre de balon'
+            ]
+            
+            if any(col in df.columns for col in expected_columns):
+                # Mapear nombres de columnas al formato esperado
+                column_mapping = {
+                    'Nombre tirador': 'nombre_tirador',
+                    'Edad': 'edad',
+                    'Experiencia': 'experiencia_anos',
+                    'Distancia de tiro': 'distancia_metros',
+                    'Angulo': 'angulo',
+                    'Altura de tirador': 'altura_tirador',
+                    'Peso': 'peso',
+                    'Ambiente': 'ambiente',
+                    'Genero': 'genero',
+                    'Peso del balon': 'peso_balon',
+                    'Tiempo de tiro': 'tiempo_tiro',
+                    'Tiro exitoso?': 'tiro_exitoso',
+                    'Diestro / Zurdo': 'mano_dominante',
+                    'Calibre de balon': 'calibre_balon'
                 }
-                invalid_rows.append(invalid_info)
-                LOGGER.warning("Skipping staging row %s due to error: %s", raw.get("id"), exc)
+                
+                # Obtener los nombres de columnas de la primera fila si es necesario
+                if df.iloc[0].isnull().sum() < len(df.columns) / 2:  # Si la primera fila tiene datos
+                    column_names = [column_mapping.get(col, col.lower().replace(' ', '_')) for col in df.columns]
+                else:
+                    # La primera fila contiene los nombres reales de las columnas
+                    column_names = [column_mapping.get(str(val), str(val).lower().replace(' ', '_')) for val in df.iloc[0]]
+                # Crear nuevo DataFrame con nombres de columnas correctos
+                df_processed = df.iloc[1:].copy()  # Saltar la primera fila (nombres)
+                df_processed.columns = column_names
 
-        inserted = 0
-        if valid_payload:
-            with session_scope() as session:
-                session.execute(sa.insert(Tiro.__table__), valid_payload)
-                inserted = len(valid_payload)
+                # Limpiar datos
+                df_processed = df_processed.dropna(how='all')  # Eliminar filas completamente vacías
 
-        return {
-            "read": total_rows,
-            "inserted": inserted,
-            "invalid": len(invalid_rows),
-            "invalid_rows": invalid_rows,
-        }
+                # Procesar datos
+                processed_data = self.processor.clean_data(df_processed)
+                stats = self._calculate_statistics(processed_data)
 
-    def clear_staging(self) -> None:
-        """Remove all rows from staging."""
-        with session_scope() as session:
-            session.execute(sa.text("TRUNCATE TABLE public.tiros_staging RESTART IDENTITY"))
-    def get_statistics(self) -> Dict[str, Any]:
-        """Aggregate metrics from the tiros table."""
-        with session_scope() as session:
-            total = session.execute(sa.select(sa.func.count(Tiro.id))).scalar_one()
-            avg_distance = session.execute(sa.select(sa.func.avg(Tiro.__table__.c.distancia_m))).scalar()
-            avg_angle = session.execute(sa.select(sa.func.avg(Tiro.__table__.c.angulo_grados))).scalar()
-            sum_exitos, sum_intentos = session.execute(
-                sa.select(
-                    sa.func.coalesce(sa.func.sum(Tiro.__table__.c.exitos), 0),
-                    sa.func.coalesce(sa.func.sum(Tiro.__table__.c.intentos), 0),
-                )
-            ).one()
+                # Guardar datos procesados para uso posterior
+                self._save_processed_data(processed_data)
 
-            genero_distribution = self._group_count(session, Tiro.__table__.c.genero, default_label="Desconocido")
-            mano_distribution = self._group_count(session, Tiro.__table__.c.mano_habil, default_label="Ambidiestro")
-            calibre_distribution = self._group_count(session, Tiro.__table__.c.calibre_balon, default_label="Sin dato")
+            else:
+                # Procesamiento estándar para otros archivos
+                validation_result = self.validator.validate_dataframe(df)
 
-        success_rate = float(sum_exitos) / float(sum_intentos) if sum_intentos else 0.0
+                if validation_result.is_valid:
+                    processed_data = self.processor.clean_data(df)
+                    stats = self._calculate_statistics(processed_data)
+                else:
+                    stats = self._calculate_statistics(df)
+                    stats.valid_records = 0
+                    stats.invalid_records = len(df)
 
-        return {
-            "total_rows": total,
-            "avg_distancia_m": float(avg_distance) if avg_distance is not None else None,
-            "avg_angulo_grados": float(avg_angle) if avg_angle is not None else None,
-            "success_rate": success_rate,
-            "distribution": {
-                "genero": genero_distribution,
-                "mano_habil": mano_distribution,
-                "calibre_balon": calibre_distribution,
-            },
-        }
+            return stats
 
-    def get_schema(self) -> List[Dict[str, Any]]:
-        """Describe the tiros table columns."""
-        columns = []
-        for column in Tiro.__table__.columns:
-            columns.append(
-                {
-                    "name": column.name,
-                    "type": str(column.type),
-                    "nullable": column.nullable,
+        except Exception as e:
+            raise ValueError(f"Error procesando archivo Excel: {str(e)}") from e
+
+    def _save_processed_data(self, df: pd.DataFrame):
+        """Guarda los datos procesados para uso posterior."""
+        try:
+            # Guardar en un archivo temporal o en memoria para uso posterior
+            df.to_csv("processed_data.csv", index=False)
+            logging.info("Datos procesados guardados: %d registros", len(df))
+        except (OSError, IOError) as e:
+            logging.error("Error guardando datos procesados: %s", str(e))
+
+    async def get_processed_data(self) -> List[Dict]:
+        """Obtiene los datos procesados desde la base de datos únicamente."""
+        try:
+            # Solo obtener datos de la base de datos
+            records = await self.db_service.get_data_records()
+            return [record.data for record in records if record.data]
+        except Exception as e:
+            logging.error("Error obteniendo datos procesados: %s", str(e))
+            return []
+
+    async def ingest_data(self, data: List[Dict]) -> Dict:
+        """Ingesta nuevos registros de datos."""
+        try:
+            # Convertir a DataFrame
+            df = pd.DataFrame(data)
+
+            # Validar datos
+            validation_result = self.validator.validate_dataframe(df)
+
+            if not validation_result.is_valid:
+                return {
+                    "success": False,
+                    "message": "Datos inválidos",
+                    "errors": validation_result.errors
                 }
-            )
-        return columns
 
-    # -----------------------------
-    # Helpers
-    # -----------------------------
-    def _rename_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        renamed = {}
-        for column in df.columns:
-            normalized = self._normalize_column_name(column)
-            target = COLUMN_ALIASES.get(normalized)
-            if target:
-                renamed[column] = target
-        return df.rename(columns=renamed)
+            # Procesar datos
+            processed_data = self.processor.clean_data(df)
 
-    @staticmethod
-    def _normalize_column_name(column: str) -> str:
-        column = column.replace("\ufeff", "").strip()
-        decomposed = unicodedata.normalize("NFKD", column)
-        ascii_only = "".join(char for char in decomposed if not unicodedata.combining(char))
-        return ascii_only.lower().strip()
+            # Guardar en base de datos
+            await self.db_service.save_data_records(processed_data.to_dict('records'), "api_ingestion")
 
-    @staticmethod
-    def _clean_column_header(column: str) -> str:
-        if not isinstance(column, str):
-            return column
-        return column.replace("\ufeff", "").strip()
+            return {
+                "success": True,
+                "message": f"Procesados {len(processed_data)} registros exitosamente",
+                "processed_records": len(processed_data),
+                "data": processed_data.to_dict('records')
+            }
 
-    def _transform_row(self, raw: Dict[str, Any]) -> Dict[str, Any]:
-        nombre = (raw.get("nombre_tirador") or "").strip()
-        if not nombre:
-            raise ValueError("nombre_tirador requerido")
+        except (ValueError, TypeError, KeyError) as e:
+            return {
+                "success": False,
+                "message": f"Error en ingesta: {str(e)}",
+                "errors": [str(e)]
+            }
+        except Exception as e:
+            # Log the full exception for debugging
+            logging.error("Unexpected error in data ingestion: %s", str(e), exc_info=True)
+            return {
+                "success": False,
+                "message": "Error inesperado en ingesta",
+                "errors": [f"Error interno: {str(e)}"]
+            }
 
-        edad = self._parse_int(raw.get("edad"), "edad")
-        experiencia = parse_anios(raw.get("experiencia", "0"))
-        distancia = Decimal(str(parse_metros(raw.get("distancia_de_tiro")))).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-        angulo = parse_grados(raw.get("angulo"))
-        altura = self._parse_decimal(raw.get("altura_de_tirador"), "altura_tirador_m", "0.01")
-        peso_tirador = Decimal(str(parse_peso_kg(raw.get("peso")))).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
-        ambiente = self._safe_strip(raw.get("ambiente"))
-        genero = normalize_genero(raw.get("genero"))
-        peso_balon = parse_peso_g(raw.get("peso_del_balon"))
-        tiempo_tiro = Decimal(str(parse_segundos(raw.get("tiempo_de_tiro")))).quantize(
-            Decimal("0.001"), rounding=ROUND_HALF_UP
-        )
-        exitos, intentos = parse_exitos_intentos(raw.get("tiro_exitoso"))
-        mano_habil = normalize_mano_habil(raw.get("diestro_zurdo"))
-        calibre = self._parse_optional_int(raw.get("calibre_de_balon"))
-
-        return {
-            "nombre_tirador": nombre,
-            "edad": edad,
-            "experiencia_anios": experiencia,
-            "distancia_m": distancia,
-            "angulo_grados": angulo,
-            "altura_tirador_m": altura,
-            "peso_tirador_kg": peso_tirador,
-            "ambiente": ambiente or None,
-            "genero": genero,
-            "peso_balon_g": peso_balon,
-            "tiempo_tiro_s": tiempo_tiro,
-            "exitos": exitos,
-            "intentos": intentos,
-            "mano_habil": mano_habil,
-            "calibre_balon": calibre,
-        }
-
-    @staticmethod
-    def _safe_strip(value: Any) -> str:
-        return value.strip() if isinstance(value, str) and value.strip() else None
-
-    @staticmethod
-    def _parse_int(value: Any, field: str) -> int:
-        if value is None or str(value).strip() == "":
-            raise ValueError(f"{field} requerido")
+    async def analyze_excel_schema(self) -> List[Dict]:
+        """Analiza el archivo Excel para extraer el esquema de columnas."""
         try:
-            return int(float(str(value).strip()))
-        except ValueError as exc:
-            raise ValueError(f"{field} invalido: {value}") from exc
+            # No leer archivos directamente, devolver esquema por defecto
+            return [
+                {"name": "nombre_tirador", "type": "string", "required": True, "description": "Nombre del tirador"},
+                {"name": "edad", "type": "number", "required": True, "description": "Edad del tirador"},
+                {"name": "experiencia", "type": "number", "required": False, "description": "Años de experiencia"},
+                {"name": "distancia_de_tiro", "type": "number", "required": False, "description": "Distancia de tiro en metros"},
+                {"name": "angulo", "type": "number", "required": False, "description": "Ángulo de tiro"},
+                {"name": "altura_de_tirador", "type": "number", "required": False, "description": "Altura del tirador"},
+                {"name": "peso", "type": "number", "required": False, "description": "Peso del tirador"},
+                {"name": "ambiente", "type": "string", "required": False, "description": "Condiciones ambientales"},
+                {"name": "genero", "type": "string", "required": False, "description": "Género del tirador"},
+                {"name": "peso_del_balon", "type": "number", "required": False, "description": "Peso del balón"},
+                {"name": "tiempo_de_tiro", "type": "number", "required": False, "description": "Tiempo de tiro"},
+                {"name": "tiro_exitoso", "type": "boolean", "required": False, "description": "Si el tiro fue exitoso"},
+                {"name": "diestro_zurdo", "type": "string", "required": False, "description": "Mano dominante"},
+                {"name": "calibre_de_balon", "type": "number", "required": False, "description": "Calibre del balón"}
+            ]
 
-    @staticmethod
-    def _parse_optional_int(value: Any) -> Any:
-        if value is None or str(value).strip() == "":
-            return None
+        except (FileNotFoundError, pd.errors.EmptyDataError, pd.errors.ParserError) as e:
+            logging.error("Error analizando esquema del Excel: %s", str(e))
+            # Retornar esquema por defecto si hay error
+            return [
+                {"name": "columna1", "type": "string", "required": True, "description": "Columna 1"},
+                {"name": "columna2", "type": "string", "required": False, "description": "Columna 2"}
+            ]
+
+    def _infer_data_type(self, data_series: pd.Series) -> str:
+        """Infiere el tipo de dato de una serie de pandas."""
+        if data_series.empty:
+            return "string"
+
+        # Limpiar datos para análisis
+        clean_series = data_series.dropna().astype(str).str.strip()
+
+        # Verificar si son valores booleanos
+        if clean_series.isin(['True', 'False', 'true', 'false', '1', '0', 'Sí', 'No', 'sí', 'no']).all():
+            return "boolean"
+
+        # Intentar convertir a numérico
         try:
-            return int(float(str(value).strip()))
-        except ValueError as exc:
-            raise ValueError(f"calibre_balon invalido: {value}") from exc
+            numeric_series = pd.to_numeric(clean_series, errors='raise')
+            # Verificar si son enteros
+            if numeric_series.apply(lambda x: x.is_integer()).all():
+                return "integer"
+            else:
+                return "number"
+        except (ValueError, TypeError):
+            pass
 
-    @staticmethod
-    def _parse_decimal(value: Any, field: str, quantize: str) -> Decimal:
-        if value is None or str(value).strip() == "":
-            raise ValueError(f"{field} requerido")
+        # Verificar si son fechas (formato más estricto)
         try:
-            decimal_value = Decimal(str(value).replace(",", "."))
-        except Exception as exc:  # pylint: disable=broad-except
-            raise ValueError(f"{field} invalido: {value}") from exc
-        return decimal_value.quantize(Decimal(quantize), rounding=ROUND_HALF_UP)
+            # Solo intentar con formatos comunes
+            pd.to_datetime(clean_series, format='%Y-%m-%d', errors='raise')
+            return "date"
+        except (ValueError, TypeError):
+            pass
 
-    def _group_count(self, session, column: Any, default_label: str) -> Dict[str, int]:
-        rows = session.execute(
-            sa.select(column, sa.func.count()).group_by(column).order_by(column)
-        ).all()
-        distribution: Dict[str, int] = {}
-        for value, count in rows:
-            key = str(value) if value is not None else default_label
-            distribution[key] = count
-        return distribution
+        # Default a string
+        return "string"
+
+    def _calculate_statistics(self, df: pd.DataFrame) -> DataProcessingStatistics:
+        """Calcula estadísticas de los datos procesados."""
+        return DataProcessingStatistics(
+            total_records=len(df),
+            valid_records=len(df),
+            invalid_records=0,
+            processing_errors=[]
+        )

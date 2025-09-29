@@ -85,3 +85,18 @@ async def update_record_status(
     except Exception as e:
         logging.error("Error actualizando estado: %s", str(e))
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+@router.delete("/database/all-data")
+async def delete_all_data(_db: Session = Depends(get_db)):
+    """Eliminar todos los datos de tiradores, sesiones y registros."""
+    try:
+        db_service = DatabaseService()
+        success = await db_service.delete_all_data()
+
+        if success:
+            return {"message": "Todos los datos han sido eliminados correctamente"}
+        else:
+            raise HTTPException(status_code=500, detail="Error eliminando los datos")
+    except Exception as e:
+        logging.error("Error eliminando todos los datos: %s", str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
