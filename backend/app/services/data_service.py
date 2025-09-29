@@ -67,24 +67,12 @@ class DataService:
             logging.error("Error guardando datos procesados: %s", str(e))
 
     async def get_processed_data(self) -> List[Dict]:
-        """Obtiene los datos procesados del archivo Excel."""
+        """Obtiene los datos procesados desde la base de datos únicamente."""
         try:
-            # Intentar cargar datos procesados
-            df = pd.read_csv("processed_data.csv")
-            return df.to_dict('records')
-        except FileNotFoundError:
-            # Si no hay datos procesados, procesar el archivo original
-            excel_path = "../evidencia big data.xlsx"
-            df = pd.read_excel(excel_path)
-
-            # Procesar con la estructura correcta
-            column_names = df.iloc[0].tolist()
-            df_processed = df.iloc[1:].copy()
-            df_processed.columns = column_names
-            df_processed = df_processed.dropna(how='all')
-
-            return df_processed.to_dict('records')
-        except (pd.errors.EmptyDataError, pd.errors.ParserError) as e:
+            # Solo obtener datos de la base de datos
+            records = await self.db_service.get_data_records()
+            return [record.data for record in records if record.data]
+        except Exception as e:
             logging.error("Error obteniendo datos procesados: %s", str(e))
             return []
 
@@ -135,37 +123,23 @@ class DataService:
     async def analyze_excel_schema(self) -> List[Dict]:
         """Analiza el archivo Excel para extraer el esquema de columnas."""
         try:
-            # Ruta del archivo Excel
-            excel_path = "../evidencia big data.xlsx"
-
-            # Leer el archivo Excel
-            df = pd.read_excel(excel_path)
-
-            # Los nombres de las columnas están en la primera fila
-            # Necesitamos extraer los nombres reales de las columnas
-            column_names = df.iloc[0].tolist()  # Primera fila contiene los nombres
-
-            # Crear esquema de columnas
-            schema = []
-            for i, col_name in enumerate(column_names):
-                if pd.notna(col_name) and str(col_name).strip():  # Solo columnas con nombre válido
-                    # Determinar el tipo de dato basado en los datos de la columna
-                    col_data = df.iloc[1:, i].dropna()  # Datos sin la fila de encabezados
-
-                    # Inferir tipo de dato
-                    data_type = self._infer_data_type(col_data)
-
-                    # Determinar si es requerido (no puede estar vacío)
-                    is_required = bool(not col_data.empty and col_data.isna().sum() == 0)
-
-                    schema.append({
-                        "name": str(col_name).strip(),
-                        "type": data_type,
-                        "required": is_required,
-                        "description": f"Columna {i+1} del archivo Excel"
-                    })
-
-            return schema
+            # No leer archivos directamente, devolver esquema por defecto
+            return [
+                {"name": "nombre_tirador", "type": "string", "required": True, "description": "Nombre del tirador"},
+                {"name": "edad", "type": "number", "required": True, "description": "Edad del tirador"},
+                {"name": "experiencia", "type": "number", "required": False, "description": "Años de experiencia"},
+                {"name": "distancia_de_tiro", "type": "number", "required": False, "description": "Distancia de tiro en metros"},
+                {"name": "angulo", "type": "number", "required": False, "description": "Ángulo de tiro"},
+                {"name": "altura_de_tirador", "type": "number", "required": False, "description": "Altura del tirador"},
+                {"name": "peso", "type": "number", "required": False, "description": "Peso del tirador"},
+                {"name": "ambiente", "type": "string", "required": False, "description": "Condiciones ambientales"},
+                {"name": "genero", "type": "string", "required": False, "description": "Género del tirador"},
+                {"name": "peso_del_balon", "type": "number", "required": False, "description": "Peso del balón"},
+                {"name": "tiempo_de_tiro", "type": "number", "required": False, "description": "Tiempo de tiro"},
+                {"name": "tiro_exitoso", "type": "boolean", "required": False, "description": "Si el tiro fue exitoso"},
+                {"name": "diestro_zurdo", "type": "string", "required": False, "description": "Mano dominante"},
+                {"name": "calibre_de_balon", "type": "number", "required": False, "description": "Calibre del balón"}
+            ]
 
         except (FileNotFoundError, pd.errors.EmptyDataError, pd.errors.ParserError) as e:
             logging.error("Error analizando esquema del Excel: %s", str(e))

@@ -1,131 +1,190 @@
-# Sistema de Data Ingestion
+# Data Ingestion System
 
-Sistema completo para procesar y gestionar datos del archivo `evidencia big data.xlsx` con interfaz web moderna y base de datos SQL Server.
+Sistema simplificado de ingesta manual de datos para análisis usando FastAPI, React y SQL Server.
 
-## Descripción
+## Características
 
-Sistema de data wrangling que procesa registros de tiradores basados en el archivo Excel de evidencia. Permite ingesta manual y automática de datos, procesamiento de archivos Excel, y visualización de resultados.
+- **Ingesta Manual**: Formulario web para entrada de datos
+- **Backend API**: FastAPI con validación automática
+- **Frontend**: React con interfaz intuitiva
+- **Base de Datos**: SQL Server en Docker
+- **Análisis**: Estadísticas y métricas básicas
+- **Modo Offline**: Funciona sin BD para demostración
 
-**Características principales:**
-- Procesamiento de archivos Excel (.xlsx)
-- Ingesta manual de datos con formulario dinámico
-- Almacenamiento en base de datos SQL Server
-- Interfaz web moderna con React
-- API REST con FastAPI
+## Requisitos Previos
 
-## Arquitectura
+- **Docker Desktop** (solo para base de datos)
+- **Python 3.8+** 
+- **Node.js 16+**
+- **SQL Server ODBC Driver 17** (para Windows, se instala automáticamente)
 
-### Backend (FastAPI + Python)
-- **FastAPI**: API REST moderna y rápida
-- **Pandas**: Procesamiento de archivos Excel
-- **SQLAlchemy**: ORM para base de datos
-- **SQL Server**: Base de datos principal
+## Instalación Rápida
 
-### Frontend (React)
-- **React**: Interfaz de usuario moderna
-- **Formularios dinámicos**: Basados en esquema de datos
-- **Carga de archivos**: Procesamiento de Excel
-- **Visualización**: Tablas interactivas de datos
-
-### Base de Datos (SQL Server)
-- **Tabla principal**: `data_records` (almacena datos JSON)
-- **Vista de estadísticas**: `vw_data_statistics`
-- **Índices optimizados**: Para consultas rápidas
-
-## Instalación y Uso
-
-### Prerrequisitos
-- Python 3.8+
-- Node.js 16+
-- SQL Server (Docker recomendado)
-
-### Instalación Rápida
-
-1. **Clonar el repositorio:**
+### 1. Clonar el repositorio
 ```bash
 git clone <repository-url>
 cd DataIngestion
 ```
 
-2. **Backend:**
+### 2. Iniciar Base de Datos
 ```bash
+# Windows
+start.bat
+
+# Manual
+docker-compose up -d
+```
+
+### 3. Configurar Backend
+```bash
+# Windows
+start-backend.bat
+
+# Manual
 cd backend
 pip install -r requirements.txt
 python -m uvicorn app.main:app --reload
 ```
 
-3. **Frontend:**
+### 4. Configurar Frontend
 ```bash
+# Windows  
+start-frontend.bat
+
+# Manual
 cd frontend
 npm install
 npm start
 ```
 
-4. **Base de datos (Docker):**
-```bash
-docker-compose up sqlserver -d
+### 5. Acceder al Sistema
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+
+## Scripts Disponibles
+
+- `start.bat` - Inicia solo la base de datos
+- `start-backend.bat` - Inicia el servidor backend
+- `start-frontend.bat` - Inicia el servidor frontend
+- `stop.bat` - Detiene la base de datos
+
+## Estructura Simplificada
+
+```
+DataIngestion/
+├── backend/                 # API FastAPI
+│   ├── app/
+│   │   ├── api/            # Rutas API
+│   │   ├── models/         # Modelos de datos
+│   │   └── services/       # Servicios
+│   └── requirements.txt    # Dependencias
+├── frontend/               # App React
+│   ├── src/
+│   │   ├── pages/         # Páginas
+│   │   └── services/      # API calls
+│   └── package.json       # Dependencias
+├── database/              # SQL Scripts
+├── docker-compose.yml     # Solo BD
+└── *.bat                 # Scripts Windows
 ```
 
-## Funcionalidades
+## API Endpoints Principales
 
-### 1. Procesamiento de Excel
-- Carga de archivo `evidencia big data.xlsx`
-- Extracción automática de 8 registros con 14 columnas
-- Validación y limpieza de datos
-
-### 2. Ingesta Manual
-- Formulario dinámico basado en esquema de datos
-- Validación en tiempo real
-- Múltiples registros simultáneos
-
-### 3. Visualización
-- Tabla interactiva con todos los datos
-- Búsqueda y filtrado
-- Estadísticas en tiempo real
-
-### 4. Base de Datos
-- Almacenamiento en SQL Server
-- Consultas optimizadas
-- Backup automático
-
-## API Endpoints
-
-### Principales
-- `POST /api/v1/data/ingest` - Ingesta manual de datos
-- `POST /api/v1/data/upload-excel` - Carga de archivo Excel
-- `GET /api/v1/data` - Obtener todos los datos
-- `GET /api/v1/data/schema` - Esquema de columnas
+### Datos Manuales
+- `POST /api/v1/data/manual-entry` - Agregar registro manual
+- `GET /api/v1/data/schema` - Esquema de campos
+- `GET /api/v1/data` - Obtener datos guardados
 - `GET /api/v1/data/statistics` - Estadísticas
 
-### Documentación
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+### Utilidades
+- `GET /api/v1/health` - Estado del sistema
 
-## Estructura de Datos
+## Campos de Datos
 
-### Archivo Excel (`evidencia big data.xlsx`)
-- **8 registros** de tiradores
-- **14 columnas**: Nombre, Edad, Experiencia, Distancia, Ángulo, etc.
-- **Formato**: Primera fila = encabezados, datos desde fila 2
+El sistema maneja estos campos para cada registro:
 
-### Base de Datos
-- **Tabla**: `data_records`
-- **Campos**: `id`, `created_at`, `data` (JSON), `source`, `is_processed`
-- **Vista**: `vw_data_statistics` para consultas rápidas
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| nombre | string | ✅ | Nombre del tirador |
+| edad | number | ❌ | Edad del tirador |
+| genero | string | ❌ | Masculino/Femenino |
+| experiencia_anos | number | ❌ | Años de experiencia |
+| distancia_metros | number | ❌ | Distancia de tiro |
+| ambiente | string | ❌ | Interior/Exterior |
+| tiros_exitosos | number | ❌ | Tiros acertados |
+| tiros_totales | number | ❌ | Total de tiros |
+| tiempo_sesion_minutos | number | ❌ | Duración sesión |
+| precision_porcentaje | number | ❌ | Calculado automáticamente |
 
-## Configuración
+## Configuración Base de Datos
 
-### Variables de Entorno
+**SQL Server** (solo con Docker):
+- **Host**: localhost:1433
+- **Usuario**: sa  
+- **Password**: YourStrong@Passw0rd
+- **BD**: DataIngestionDB
+
+## Modo Offline
+
+Si la base de datos no está disponible, el sistema funciona en **modo offline**:
+- Acepta y procesa datos normalmente
+- Muestra mensaje indicando el modo
+- Permite demostrar funcionalidad sin BD
+
+## Solución de Problemas
+
+### Backend no inicia
 ```bash
-# Backend
-DATABASE_URL=mssql+pyodbc://sa:YourStrong@Passw0rd@localhost:1433/DataIngestionDB?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes
-
-# Frontend
-REACT_APP_API_URL=http://localhost:8000/api/v1
+cd backend
+pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-### Conexión a Base de Datos
-- **Server**: localhost,1433
-- **Database**: DataIngestionDB
-- **Username**: sa
-- **Password**: YourStrong@Passw0rd
+### Frontend no inicia  
+```bash
+cd frontend
+npm install --force
+npm start
+```
+
+### Error de Base de Datos
+```bash
+docker-compose down
+docker-compose up -d
+# Esperar 30 segundos
+```
+
+### Puerto ocupado
+- Backend (8000): Cambiar en `uvicorn --port 8001`
+- Frontend (3000): Se detecta automáticamente
+- BD (1433): Cambiar en `docker-compose.yml`
+
+## Desarrollo
+
+### Solo Frontend (modo demo)
+```bash
+cd frontend && npm start
+# Funciona en modo offline
+```
+
+### Solo Backend (API testing)
+```bash
+cd backend && python -m uvicorn app.main:app --reload
+# Ir a http://localhost:8000/docs
+```
+
+## Comandos Útiles
+
+```bash
+# Ver logs de BD
+docker logs data-ingestion-sqlserver
+
+# Conectar a BD
+docker exec -it data-ingestion-sqlserver /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P YourStrong@Passw0rd -C
+
+# Limpiar todo
+docker-compose down -v
+```
+
+Este sistema está optimizado para desarrollo local y demostraciones rápidas.

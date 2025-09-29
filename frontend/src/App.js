@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
 import DataForm from './pages/DataForm';
 import DataViewer from './pages/DataViewer';
+import DebugPanel from './components/DebugPanel';
 import './App.css';
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
               <Route path="/view" element={<DataViewer />} />
             </Routes>
           </main>
+          <DebugPanel />
         </div>
       </Router>
     </DataIngestionProvider>

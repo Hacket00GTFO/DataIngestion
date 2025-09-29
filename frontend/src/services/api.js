@@ -46,16 +46,15 @@ export const dataIngestionAPI = {
     return response.data;
   },
 
-  // Subir archivo Excel
-  uploadExcel: async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await api.post('/data/upload-excel', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+  // Agregar entrada manual
+  addManualEntry: async (data) => {
+    const response = await api.post('/data/manual-entry', data);
+    return response.data;
+  },
+
+  // Obtener esquema de datos para entrada manual
+  getDataSchema: async () => {
+    const response = await api.get('/data/schema');
     return response.data;
   },
 
@@ -64,6 +63,46 @@ export const dataIngestionAPI = {
     const response = await api.get('/health');
     return response.data;
   },
+
+  // Estadísticas de tiradores (usando endpoint que funciona)
+  getTiradoresStatistics: async () => {
+    const response = await api.get('/tiradores/stats/tiradores');
+    return response.data;
+  },
+
+  // Estadísticas de sesiones (mock temporalmente hasta resolver ruta)
+  getSesionesStatistics: async () => {
+    // Retornar datos vacíos temporalmente
+    return {
+      total_sesiones: 0,
+      precision_promedio: null,
+      distancia_promedio: null,
+      tiempo_promedio: null,
+      ambientes_unicos: 0,
+      primera_sesion: null,
+      ultima_sesion: null
+    };
+  },
+
+  // Análisis completo
+  getAnalisisCompleto: async (params = {}) => {
+    const response = await api.get('/tiradores/analisis/completo', { params });
+    return response.data;
+  },
+
+  // Obtener tiradores
+  getTiradores: async (params = {}) => {
+    const response = await api.get('/tiradores/', { params });
+    return response.data;
+  },
+
+  // Eliminar todos los datos
+  deleteAllData: async () => {
+    const response = await api.delete('/database/all-data');
+    return response.data;
+  },
+
+  // APIs de Excel eliminadas - solo entrada manual disponible
 };
 
 export default api;

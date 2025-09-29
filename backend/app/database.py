@@ -14,16 +14,24 @@ DATABASE_URL = os.getenv(
     "driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes"
 )
 
-# Crear engine de SQLAlchemy
+# Mejorar la URL de conexión con parámetros de timeout optimizados
+if "?" in DATABASE_URL:
+    # Agregar parámetros de timeout específicos para evitar login timeout
+    DATABASE_URL += "&timeout=60&login_timeout=60&connection_timeout=60"
+else:
+    DATABASE_URL += "?timeout=60&login_timeout=60&connection_timeout=60"
+
+# Crear engine de SQLAlchemy con configuración optimizada
 engine = create_engine(
     DATABASE_URL,
     poolclass=StaticPool,
     connect_args={
-        "timeout": 30,
+        "timeout": 60,  # Aumentar timeout de conexión
+        "login_timeout": 60,  # Timeout específico para login
     },
     echo=False,  # Cambiar a True para ver las consultas SQL
     pool_pre_ping=True,  # Verificar conexión antes de usar
-    pool_recycle=300  # Reciclar conexiones cada 5 minutos
+    pool_recycle=300,  # Reciclar conexiones cada 5 minutos
 )
 
 # Crear sesión
@@ -56,18 +64,30 @@ def init_database():
         logging.error("Error inicializando base de datos: %s", str(e))
         raise
 
-def test_connection():
-    """Probar la conexión a la base de datos."""
+# Variable global para caché de estado de conexión
+_connection_status = {"available": None, "last_check": 0}
+
+def test_connection(force_check: bool = False):
+    """Probar la conexión a la base de datos con caché para evitar reintentos innecesarios."""
     import time
     from sqlalchemy import text
-    max_retries = 5
-    retry_delay = 5
+    
+    current_time = time.time()
+    # Caché de estado de conexión por 30 segundos para evitar checks repetitivos
+    if not force_check and _connection_status["available"] is not None:
+        if current_time - _connection_status["last_check"] < 30:
+            return _connection_status["available"]
+    
+    max_retries = 3  # Reducir reintentos para operaciones frecuentes
+    retry_delay = 2  # Reducir delay entre reintentos
     
     for attempt in range(max_retries):
         try:
             with engine.connect() as connection:
                 connection.execute(text("SELECT 1"))
                 logging.info("Conexión a base de datos exitosa")
+                _connection_status["available"] = True
+                _connection_status["last_check"] = current_time
                 return True
         except Exception as e:
             logging.warning("Intento %d/%d falló: %s", attempt + 1, max_retries, str(e))
@@ -75,4 +95,6 @@ def test_connection():
                 time.sleep(retry_delay)
             else:
                 logging.error("Error conectando a base de datos después de %d intentos: %s", max_retries, str(e))
+                _connection_status["available"] = False
+                _connection_status["last_check"] = current_time
                 return False

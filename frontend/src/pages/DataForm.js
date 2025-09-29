@@ -1,68 +1,58 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useDataIngestion } from '../services/DataIngestionContext';
 import './DataForm.css';
 
 const DataForm = () => {
-  const { ingestData, getSchema, getData } = useDataIngestion();
-  const [formData, setFormData] = useState([]);
+  const { addManualEntry, getDataSchema, getData } = useDataIngestion();
+  const [formData, setFormData] = useState({});
   const [schema, setSchema] = useState([]);
   const [existingData, setExistingData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
 
-  useEffect(() => {
-    loadSchema();
-    loadExistingData();
-  }, []);
-
-  const loadSchema = async () => {
+  const loadSchema = useCallback(async () => {
     try {
-      const schemaData = await getSchema();
+      const schemaData = await getDataSchema();
       setSchema(schemaData.columns || []);
       initializeFormData(schemaData.columns || []);
     } catch (error) {
       setMessage('Error cargando esquema de datos');
       setMessageType('error');
     }
-  };
+  }, [getDataSchema]);
 
-  const loadExistingData = async () => {
+  const loadExistingData = useCallback(async () => {
     try {
       const dataResponse = await getData();
       setExistingData(dataResponse.data || []);
     } catch (error) {
       console.error('Error cargando datos existentes:', error);
     }
-  };
+  }, [getData]);
+
+  useEffect(() => {
+    loadSchema();
+    loadExistingData();
+  }, [loadSchema, loadExistingData]);
 
   const initializeFormData = (columns) => {
     const initialData = {};
     columns.forEach(column => {
-      initialData[column.name] = '';
+      initialData[column.name] = column.type === 'number' ? '' : '';
     });
-    setFormData([initialData]);
+    setFormData(initialData);
   };
 
-  const addNewRecord = () => {
-    const newRecord = {};
-    schema.forEach(column => {
-      newRecord[column.name] = '';
+  const updateField = (field, value) => {
+    setFormData({
+      ...formData,
+      [field]: value
     });
-    setFormData([...formData, newRecord]);
   };
 
-  const removeRecord = (index) => {
-    if (formData.length > 1) {
-      const newData = formData.filter((_, i) => i !== index);
-      setFormData(newData);
-    }
-  };
-
-  const updateRecord = (index, field, value) => {
-    const newData = [...formData];
-    newData[index][field] = value;
-    setFormData(newData);
+  const resetForm = () => {
+    initializeFormData(schema);
   };
 
   const handleSubmit = async (e) => {
@@ -71,11 +61,26 @@ const DataForm = () => {
     setMessage('');
 
     try {
-      const result = await ingestData(formData);
+      // Filtrar campos vacíos para enviar solo datos válidos
+      const cleanData = {};
+      Object.keys(formData).forEach(key => {
+        if (formData[key] !== '' && formData[key] !== null && formData[key] !== undefined) {
+          // Convertir números si es necesario
+          const schemaField = schema.find(s => s.name === key);
+          if (schemaField && schemaField.type === 'number') {
+            cleanData[key] = parseFloat(formData[key]) || 0;
+          } else {
+            cleanData[key] = formData[key];
+          }
+        }
+      });
+
+      const result = await addManualEntry(cleanData);
       if (result.success) {
         setMessage(result.message);
         setMessageType('success');
-        initializeFormData(schema);
+        resetForm();
+        loadExistingData(); // Recargar datos para mostrar el nuevo registro
       } else {
         setMessage(result.message || 'Error en el procesamiento');
         setMessageType('error');
@@ -88,46 +93,11 @@ const DataForm = () => {
     }
   };
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const response = await fetch('/api/v1/data/upload-excel', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        setMessage('Archivo procesado exitosamente. Recargando datos...');
-        setMessageType('success');
-        
-        // Recargar el esquema y datos después de procesar el archivo
-        await loadSchema();
-        await loadExistingData();
-      } else {
-        setMessage('Error procesando archivo');
-        setMessageType('error');
-      }
-    } catch (error) {
-      setMessage('Error subiendo archivo');
-      setMessageType('error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="data-form">
       <div className="container">
-        <h2>Ingesta de Datos</h2>
-        <p>Ingrese nuevos registros basados en el esquema de evidencia big data.</p>
+        <h2>Ingesta Manual de Datos</h2>
+        <p>Ingrese nuevos registros de tiro de forma manual para análisis.</p>
 
         {message && (
           <div className={`alert alert-${messageType}`}>
@@ -136,15 +106,15 @@ const DataForm = () => {
         )}
 
         <div className="form-section">
-          <h3>Datos del Archivo Excel</h3>
+          <h3>Datos Existentes</h3>
           {existingData.length > 0 ? (
             <div className="data-preview">
-              <p>Se encontraron {existingData.length} registros en el archivo Excel:</p>
+              <p>Se encontraron {existingData.length} registros:</p>
               <div className="data-table-container">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      {schema.map((column) => (
+                      {schema.slice(0, 6).map((column) => (
                         <th key={column.name}>{column.name}</th>
                       ))}
                     </tr>
@@ -152,7 +122,7 @@ const DataForm = () => {
                   <tbody>
                     {existingData.slice(0, 5).map((record, index) => (
                       <tr key={index}>
-                        {schema.map((column) => (
+                        {schema.slice(0, 6).map((column) => (
                           <td key={column.name}>
                             {record[column.name] || '-'}
                           </td>
@@ -169,92 +139,84 @@ const DataForm = () => {
               </div>
             </div>
           ) : (
-            <p>No hay datos cargados del archivo Excel aún.</p>
+            <p>No hay datos cargados aún. Agregue el primer registro abajo.</p>
           )}
         </div>
 
         <div className="form-section">
-          <h3>Subir Archivo Excel</h3>
-          <div className="file-upload">
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileUpload}
-              className="file-input"
-              id="file-upload"
-            />
-            <label htmlFor="file-upload" className="file-label">
-              Seleccionar Archivo Excel
-            </label>
-          </div>
-        </div>
-
-        <div className="form-section">
           <div className="section-header">
-            <h3>Ingreso Manual de Datos</h3>
-            <button
-              type="button"
-              onClick={addNewRecord}
-              className="btn btn-secondary"
-            >
-              Agregar Registro
-            </button>
+            <h3>Nuevo Registro</h3>
           </div>
 
           <form onSubmit={handleSubmit}>
-            {formData.map((record, recordIndex) => (
-              <div key={recordIndex} className="record-form">
-                <div className="record-header">
-                  <h4>Registro {recordIndex + 1}</h4>
-                  {formData.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeRecord(recordIndex)}
-                      className="btn btn-danger"
-                    >
-                      Eliminar
-                    </button>
+            <div className="form-grid">
+              {schema.map((column) => (
+                <div key={column.name} className="form-group">
+                  <label className="form-label">
+                    {column.name.replace(/_/g, ' ').toUpperCase()}
+                    {column.required && <span className="required">*</span>}
+                  </label>
+                  {column.description && (
+                    <small className="field-description">{column.description}</small>
                   )}
+                  
+                  {column.name === 'genero' ? (
+                    <select 
+                      className="form-input"
+                      value={formData[column.name] || ''}
+                      onChange={(e) => updateField(column.name, e.target.value)}
+                      required={column.required}
+                    >
+                      <option value="">Seleccionar...</option>
+                      <option value="Masculino">Masculino</option>
+                      <option value="Femenino">Femenino</option>
+                    </select>
+                  ) : column.name === 'ambiente' ? (
+                    <select 
+                      className="form-input"
+                      value={formData[column.name] || ''}
+                      onChange={(e) => updateField(column.name, e.target.value)}
+                      required={column.required}
+                    >
+                      <option value="">Seleccionar...</option>
+                      <option value="Interior">Interior</option>
+                      <option value="Exterior">Exterior</option>
+                    </select>
+                  ) : (
+                    <input
+                      type={column.type === 'number' ? 'number' : 'text'}
+                      className="form-input"
+                      value={formData[column.name] || ''}
+                      onChange={(e) => updateField(column.name, e.target.value)}
+                      required={column.required}
+                      placeholder={`Ingrese ${column.name.replace(/_/g, ' ').toLowerCase()}`}
+                      step={column.type === 'number' ? '0.01' : undefined}
+                      min={column.type === 'number' && (column.name.includes('edad') || column.name.includes('experiencia') || column.name.includes('tiros')) ? '0' : undefined}
+                    />
+                  )}
+                  
+                  <small className="field-type">
+                    {column.required ? 'Requerido' : 'Opcional'}
+                  </small>
                 </div>
-
-                <div className="form-grid">
-                  {schema.map((column) => (
-                    <div key={column.name} className="form-group">
-                      <label className="form-label">
-                        {column.name}
-                        {column.required && <span className="required">*</span>}
-                        {column.description && (
-                          <span className="field-description"> - {column.description}</span>
-                        )}
-                      </label>
-                      <input
-                        type={column.type === 'number' || column.type === 'integer' ? 'number' : 
-                              column.type === 'date' ? 'date' : 
-                              column.type === 'boolean' ? 'checkbox' : 'text'}
-                        className="form-input"
-                        value={record[column.name] || ''}
-                        onChange={(e) => updateRecord(recordIndex, column.name, 
-                          column.type === 'boolean' ? e.target.checked : e.target.value)}
-                        required={column.required}
-                        placeholder={`Ingrese ${column.name.toLowerCase()}`}
-                        checked={column.type === 'boolean' ? record[column.name] === true : undefined}
-                      />
-                      <small className="field-type">
-                        Tipo: {column.type} {column.required ? '(Requerido)' : '(Opcional)'}
-                      </small>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
 
             <div className="form-actions">
+              <button
+                type="button"
+                onClick={resetForm}
+                className="btn btn-secondary"
+                style={{marginRight: '10px'}}
+              >
+                Limpiar
+              </button>
               <button
                 type="submit"
                 className="btn btn-primary"
                 disabled={loading}
               >
-                {loading ? 'Procesando...' : 'Procesar Datos'}
+                {loading ? 'Guardando...' : 'Guardar Registro'}
               </button>
             </div>
           </form>

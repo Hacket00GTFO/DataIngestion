@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useDataIngestion } from '../services/DataIngestionContext';
 import './DataViewer.css';
 
 const DataViewer = () => {
-  const { getData } = useDataIngestion();
+  const { getData, deleteAllData } = useDataIngestion();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -12,18 +12,40 @@ const DataViewer = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
+      console.log('Loading data viewer data...');
       const result = await getData();
       setData(result.data || []);
+      console.log('Data viewer data loaded successfully');
     } catch (err) {
+      console.error('Error loading data viewer data:', err);
       setError('Error cargando datos');
+    } finally {
+      setLoading(false);
+    }
+  }, [getData]);
+
+  useEffect(() => {
+    console.log('DataViewer useEffect triggered');
+    loadData();
+  }, [loadData]);
+
+  const handleDeleteAllData = async () => {
+    try {
+      setLoading(true);
+      await deleteAllData();
+      setData([]);
+      setShowDeleteConfirm(false);
+      setCurrentPage(1);
+      alert('Todos los datos han sido eliminados correctamente');
+    } catch (err) {
+      setError('Error eliminando datos: ' + err.message);
+      alert('Error eliminando datos: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -114,6 +136,18 @@ const DataViewer = () => {
             />
           </div>
           
+          <div className="viewer-actions">
+            {data.length > 0 && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="btn btn-danger"
+                disabled={loading}
+              >
+                Eliminar Todos los Datos
+              </button>
+            )}
+          </div>
+          
           <div className="viewer-info">
             <span>
               Mostrando {paginatedData().length} de {filteredAndSortedData().length} registros
@@ -186,6 +220,35 @@ const DataViewer = () => {
               </div>
             )}
           </>
+        )}
+
+        {/* Modal de confirmación */}
+        {showDeleteConfirm && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <h3>¿Confirmar eliminación?</h3>
+              <p>
+                Esta acción eliminará <strong>TODOS</strong> los datos de tiradores y sesiones de tiro.
+                Esta operación no se puede deshacer.
+              </p>
+              <div className="modal-actions">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="btn btn-secondary"
+                  disabled={loading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteAllData}
+                  className="btn btn-danger"
+                  disabled={loading}
+                >
+                  {loading ? 'Eliminando...' : 'Sí, Eliminar Todo'}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
