@@ -1,9 +1,11 @@
 """Main FastAPI application module."""
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+
 from app.api import data_routes, health_routes
-from app.services.data_service import DataService
 
 app = FastAPI(
     title="Data Ingestion API",
@@ -12,16 +14,14 @@ app = FastAPI(
 )
 
 # Configuración CORS
+allowed_origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Inicialización de servicios
-data_service = DataService()
 
 # Registro de rutas
 app.include_router(health_routes.router, prefix="/api/v1", tags=["health"])

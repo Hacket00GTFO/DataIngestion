@@ -1,113 +1,115 @@
-"""Data processing utilities for cleaning and transforming data."""
-from typing import Dict, Any
-import pandas as pd
-import numpy as np
+"""Utilities to parse and normalize shooter metrics coming from CSV uploads."""
+from __future__ import annotations
 
-class DataProcessor:
-    """Clase para procesamiento y limpieza de datos"""
+import re
+from typing import Tuple
 
-    def __init__(self):
-        self.cleaning_rules = {
-            'remove_duplicates': True,
-            'handle_nulls': True,
-            'normalize_text': True,
-            'validate_ranges': True
-        }
+_NUMERIC_PATTERN = re.compile(r"-?\d+(?:[\.,]\d+)?")
 
-    def clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Limpia y procesa los datos."""
-        cleaned_df = df.copy()
+_GENERO_MAP = {
+    "masculino": "Masculino",
+    "femenino": "Femenino",
+    "otro": "Otro",
+}
 
-        # Eliminar duplicados
-        if self.cleaning_rules['remove_duplicates']:
-            cleaned_df = self._remove_duplicates(cleaned_df)
+_MANO_MAP = {
+    "diestro": "Diestro",
+    "zurdo": "Zurdo",
+    "ambidiestro": "Ambidiestro",
+}
 
-        # Manejar valores nulos
-        if self.cleaning_rules['handle_nulls']:
-            cleaned_df = self._handle_nulls(cleaned_df)
 
-        # Normalizar texto
-        if self.cleaning_rules['normalize_text']:
-            cleaned_df = self._normalize_text(cleaned_df)
+def _extract_numeric(value: str) -> str:
+    """Return the first numeric fragment found in the input string."""
+    if value is None:
+        raise ValueError("valor vacio")
 
-        # Validar rangos
-        if self.cleaning_rules['validate_ranges']:
-            cleaned_df = self._validate_ranges(cleaned_df)
+    match = _NUMERIC_PATTERN.search(str(value))
+    if not match:
+        raise ValueError(f"no se encontro numero en '{value}'")
+    return match.group(0).replace(",", ".")
 
-        return cleaned_df
 
-    def _remove_duplicates(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Elimina registros duplicados."""
-        return df.drop_duplicates()
+def parse_anios(value: str) -> int:
+    """Parse strings like '4 años' into an integer."""
+    number = int(float(_extract_numeric(value)))
+    if number < 0:
+        raise ValueError("experiencia negativa")
+    return number
 
-    def _handle_nulls(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Maneja valores nulos."""
-        # Para columnas numéricas, reemplazar con la mediana
-        numeric_columns = df.select_dtypes(include=[np.number]).columns
-        for col in numeric_columns:
-            df[col] = df[col].fillna(df[col].median())
 
-        # Para columnas de texto, reemplazar con 'N/A'
-        text_columns = df.select_dtypes(include=['object']).columns
-        for col in text_columns:
-            df[col] = df[col].fillna('N/A')
+def parse_metros(value: str) -> float:
+    """Parse strings like '5 metros' into meters as float."""
+    number = float(_extract_numeric(value))
+    if number <= 0:
+        raise ValueError("distancia invalida")
+    return round(number, 2)
 
-        return df
 
-    def _normalize_text(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Normaliza texto en las columnas."""
-        text_columns = df.select_dtypes(include=['object']).columns
-        for col in text_columns:
-            df[col] = df[col].astype(str).str.strip().str.lower()
-        return df
+def parse_grados(value: str) -> int:
+    """Parse strings like '90 grados' into degrees as integer."""
+    number = int(float(_extract_numeric(value)))
+    if not 0 <= number <= 360:
+        raise ValueError("angulo fuera de rango")
+    return number
 
-    def _validate_ranges(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Valida rangos de valores numéricos."""
-        # Aquí se implementarían reglas específicas según el dominio
-        # Por ejemplo, validar que las edades estén entre 0 y 120
-        return df
 
-    def transform_data(self, df: pd.DataFrame, transformations: Dict[str, Any]) -> pd.DataFrame:
-        """Aplica transformaciones específicas a los datos."""
-        transformed_df = df.copy()
+def parse_peso_kg(value: str) -> float:
+    """Parse strings like '95 kg' or '50kg' into kilograms as float."""
+    number = float(_extract_numeric(value))
+    if number <= 0:
+        raise ValueError("peso tirador invalido")
+    return round(number, 2)
 
-        for transformation, params in transformations.items():
-            if transformation == 'group_by':
-                transformed_df = self._group_by(transformed_df, params)
-            elif transformation == 'aggregate':
-                transformed_df = self._aggregate(transformed_df, params)
-            elif transformation == 'filter':
-                transformed_df = self._filter_data(transformed_df, params)
 
-        return transformed_df
+def parse_peso_g(value: str) -> int:
+    """Parse strings like '500 g' into grams as integer."""
+    number = int(float(_extract_numeric(value)))
+    if number <= 0:
+        raise ValueError("peso balon invalido")
+    return number
 
-    def _group_by(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
-        """Agrupa datos por columnas específicas."""
-        group_columns = params.get('columns', [])
-        agg_functions = params.get('aggregations', {})
 
-        if group_columns and agg_functions:
-            return df.groupby(group_columns).agg(agg_functions).reset_index()
-        return df
+def parse_segundos(value: str) -> float:
+    """Parse strings like '1 segundo' or '2 segundos' into seconds as float."""
+    number = float(_extract_numeric(value))
+    if number <= 0:
+        raise ValueError("tiempo de tiro invalido")
+    return round(number, 3)
 
-    def _aggregate(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
-        """Aplica agregaciones a los datos."""
-        # Implementar agregaciones específicas
-        # params se usará en futuras implementaciones
-        _ = params  # Evitar warning de parámetro no usado
-        return df
 
-    def _filter_data(self, df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
-        """Filtra datos según criterios específicos."""
-        conditions = params.get('conditions', {})
+def parse_exitos_intentos(value: str) -> Tuple[int, int]:
+    """Parse expressions like '2 de 6' into (exitos, intentos)."""
+    if value is None:
+        raise ValueError("valor vacio")
 
-        for column, condition in conditions.items():
-            if column in df.columns:
-                if condition['operator'] == 'equals':
-                    df = df[df[column] == condition['value']]
-                elif condition['operator'] == 'greater_than':
-                    df = df[df[column] > condition['value']]
-                elif condition['operator'] == 'less_than':
-                    df = df[df[column] < condition['value']]
+    parts = re.split(r"\s*de\s*", str(value), flags=re.IGNORECASE)
+    if len(parts) != 2:
+        raise ValueError(f"formato invalido para exitos/intentos: '{value}'")
 
-        return df
+    exitos = int(parts[0].strip())
+    intentos = int(_extract_numeric(parts[1]))
+
+    if exitos < 0:
+        raise ValueError("exitos negativos")
+    if intentos <= 0 or intentos > 100:
+        raise ValueError("intentos fuera de rango")
+    if exitos > intentos:
+        raise ValueError("exitos no pueden superar intentos")
+    return exitos, intentos
+
+
+def normalize_genero(value: str) -> str:
+    """Normalize gender values to the genero_enum choices."""
+    if not value:
+        return "Otro"
+    key = str(value).strip().lower()
+    return _GENERO_MAP.get(key, "Otro")
+
+
+def normalize_mano_habil(value: str) -> str:
+    """Normalize handedness to mano_habil_enum choices."""
+    if not value:
+        return "Ambidiestro"
+    key = str(value).strip().lower()
+    return _MANO_MAP.get(key, "Ambidiestro")

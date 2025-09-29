@@ -1,106 +1,89 @@
-"""API routes for data management endpoints."""
-import os
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from app.models.data_models import DataIngestionRequest, DataProcessingResponse
+"""API routes for data ingestion and reporting."""
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any, Dict
+
+import pandas as pd
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
+
 from app.services.data_service import DataService
+
+LOGGER = logging.getLogger(__name__)
 
 router = APIRouter()
 data_service = DataService()
 
-@router.post("/data/ingest", response_model=DataProcessingResponse)
-async def ingest_data(request: DataIngestionRequest):
-    """Endpoint para ingesta de nuevos datos."""
-    try:
-        result = await data_service.ingest_data(request.data)
-        return DataProcessingResponse(**result)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
 
 @router.post("/data/upload-excel")
-async def upload_excel(file: UploadFile = File(...)):
-    """Endpoint para subir y procesar archivo Excel."""
+async def upload_excel(file: UploadFile = File(...)) -> Dict[str, Any]:
+    """Upload an Excel or CSV file and push its contents into PostgreSQL."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Nombre de archivo inválido")
+
     try:
-        # Guardar archivo temporalmente
-        file_path = f"temp_{file.filename}"
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
+        with TemporaryDirectory() as tmpdir:
+            temp_input = Path(tmpdir) / file.filename
+            temp_input.write_bytes(await file.read())
 
-        # Procesar archivo
-        stats = await data_service.process_excel_data(file_path)
+            csv_path = await _ensure_csv(temp_input)
+            rows_loaded = await run_in_threadpool(data_service.load_csv_to_staging, str(csv_path))
+            transform_result = await run_in_threadpool(data_service.transform_staging_to_final)
+            await run_in_threadpool(data_service.clear_staging)
 
-        # Limpiar archivo temporal
-        os.remove(file_path)
+        metrics = {
+            "filas_cargadas": rows_loaded,
+            "filas_leidas": transform_result["read"],
+            "filas_insertadas": transform_result["inserted"],
+            "filas_rechazadas": transform_result["invalid"],
+        }
 
         return {
             "success": True,
             "message": "Archivo procesado exitosamente",
-            "statistics": stats.dict()
+            "metrics": metrics,
+            "rechazados": transform_result["invalid_rows"],
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as exc:  # pylint: disable=broad-except
+        LOGGER.exception("Error procesando archivo de datos")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
 
 @router.get("/data/statistics")
-async def get_data_statistics():
-    """Endpoint para obtener estadísticas de los datos del Excel."""
-    return {
-        "success": True,
-        "message": "Estadísticas calculadas exitosamente",
-        "total_records": 8,
-        "valid_records": 7,
-        "invalid_records": 1,
-        "columns_count": 14,
-        "data_sources": ["evidencia big data.xlsx"],
-        "column_statistics": {
-            "Nombre tirador": {"unique_values": 8, "null_values": 0},
-            "Edad": {"unique_values": 6, "null_values": 1},
-            "Experiencia": {"unique_values": 4, "null_values": 1},
-            "Distancia de tiro": {"unique_values": 3, "null_values": 1},
-            "Angulo": {"unique_values": 2, "null_values": 1},
-            "Altura de tirador": {"unique_values": 5, "null_values": 1},
-            "Peso": {"unique_values": 8, "null_values": 1},
-            "Ambiente": {"unique_values": 1, "null_values": 1},
-            "Genero": {"unique_values": 2, "null_values": 1},
-            "Peso del balon": {"unique_values": 1, "null_values": 1},
-            "Tiempo de tiro": {"unique_values": 4, "null_values": 1},
-            "Tiro exitoso?": {"unique_values": 4, "null_values": 1},
-            "Diestro / zurdo": {"unique_values": 1, "null_values": 1},
-            "Calibre de balon": {"unique_values": 1, "null_values": 1}
-        }
-    }
-
-@router.get("/data")
-async def get_data():
-    """Endpoint para obtener todos los datos del archivo Excel."""
+async def get_statistics() -> Dict[str, Any]:
+    """Return aggregated metrics for the tiros dataset."""
     try:
-        result = await data_service.get_excel_data()
-        if result["success"]:
-            return result
-        else:
-            raise HTTPException(status_code=500, detail=result["message"])
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        stats = await run_in_threadpool(data_service.get_statistics)
+        return {"success": True, "statistics": stats}
+    except Exception as exc:  # pylint: disable=broad-except
+        LOGGER.exception("Error obteniendo estadisticas")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
 
 @router.get("/data/schema")
-async def get_data_schema():
-    """Endpoint para obtener el esquema de datos del archivo Excel."""
-    return {
-        "success": True,
-        "message": "Esquema obtenido exitosamente",
-        "columns": [
-            {"name": "Nombre tirador", "type": "string", "required": False},
-            {"name": "Edad", "type": "number", "required": False},
-            {"name": "Experiencia", "type": "string", "required": False},
-            {"name": "Distancia de tiro", "type": "string", "required": False},
-            {"name": "Angulo", "type": "string", "required": False},
-            {"name": "Altura de tirador", "type": "number", "required": False},
-            {"name": "Peso", "type": "string", "required": False},
-            {"name": "Ambiente", "type": "string", "required": False},
-            {"name": "Genero", "type": "string", "required": False},
-            {"name": "Peso del balon", "type": "string", "required": False},
-            {"name": "Tiempo de tiro", "type": "string", "required": False},
-            {"name": "Tiro exitoso?", "type": "string", "required": False},
-            {"name": "Diestro / zurdo", "type": "string", "required": False},
-            {"name": "Calibre de balon", "type": "number", "required": False}
-        ]
-    }
+async def get_schema() -> Dict[str, Any]:
+    """Describe the tiros table schema."""
+    try:
+        schema = await run_in_threadpool(data_service.get_schema)
+        return {"success": True, "columns": schema}
+    except Exception as exc:  # pylint: disable=broad-except
+        LOGGER.exception("Error obteniendo esquema")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+async def _ensure_csv(path: Path) -> Path:
+    """If the provided path points to Excel, convert it to CSV."""
+    suffix = path.suffix.lower()
+    if suffix in {".csv"}:
+        return path
+
+    if suffix in {".xlsx", ".xls"}:
+        df = await run_in_threadpool(pd.read_excel, path)
+        csv_path = path.with_suffix(".csv")
+        await run_in_threadpool(df.to_csv, csv_path, index=False)
+        return csv_path
+
+    raise HTTPException(status_code=400, detail="Formato de archivo no soportado - use CSV o Excel")
