@@ -38,7 +38,7 @@ class DataValidator:
             is_valid=is_valid,
             errors=errors,
             warnings=warnings,
-            validated_data=df.to_dict('records') if is_valid else None
+            validated_data=df.to_dict('records') if is_valid else None # type: ignore
         )
 
     def _check_required_columns(self, df: pd.DataFrame) -> List[str]:
