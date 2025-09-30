@@ -137,6 +137,9 @@ yarn-error.log*
 # React build
 build/
 
+# Frontend cache
+frontend/node_modules/.cache/
+
 # IDE
 .vscode/
 .idea/
