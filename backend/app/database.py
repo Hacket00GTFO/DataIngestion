@@ -1,8 +1,9 @@
 """Database configuration and connection management."""
 import logging
 import os
+import time
 
-from sqlalchemy import create_engine, MetaData
+from sqlalchemy import create_engine, MetaData, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -10,16 +11,9 @@ from sqlalchemy.pool import StaticPool
 # Configuración de la base de datos
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "mssql+pyodbc://@localhost/DataIngestionDB?"
-    "driver=ODBC+Driver+17+for+SQL+Server&Trusted_Connection=yes&TrustServerCertificate=yes"
+    "mssql+pyodbc://sa:YourStrong%40Passw0rd@localhost:1433/DataIngestionDB?"
+    "driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes&Encrypt=no"
 )
-
-# Mejorar la URL de conexión con parámetros de timeout optimizados
-if "?" in DATABASE_URL:
-    # Agregar parámetros de timeout específicos para evitar login timeout
-    DATABASE_URL += "&timeout=60&login_timeout=60&connection_timeout=60"
-else:
-    DATABASE_URL += "?timeout=60&login_timeout=60&connection_timeout=60"
 
 # Crear engine de SQLAlchemy con configuración optimizada
 engine = create_engine(
@@ -69,18 +63,15 @@ _connection_status = {"available": None, "last_check": 0}
 
 def test_connection(force_check: bool = False):
     """Probar la conexión a la base de datos con caché para evitar reintentos innecesarios."""
-    import time
-    from sqlalchemy import text
-    
     current_time = time.time()
     # Caché de estado de conexión por 30 segundos para evitar checks repetitivos
     if not force_check and _connection_status["available"] is not None:
         if current_time - _connection_status["last_check"] < 30:
             return _connection_status["available"]
-    
+
     max_retries = 3  # Reducir reintentos para operaciones frecuentes
     retry_delay = 2  # Reducir delay entre reintentos
-    
+
     for attempt in range(max_retries):
         try:
             with engine.connect() as connection:
@@ -94,7 +85,9 @@ def test_connection(force_check: bool = False):
             if attempt < max_retries - 1:
                 time.sleep(retry_delay)
             else:
-                logging.error("Error conectando a base de datos después de %d intentos: %s", max_retries, str(e))
+                error_msg = (f"Error conectando a base de datos después de "
+                           f"{max_retries} intentos: {str(e)}")
+                logging.error(error_msg)
                 _connection_status["available"] = False
                 _connection_status["last_check"] = current_time
                 return False
