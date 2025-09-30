@@ -315,14 +315,14 @@ PRINT 'Base de datos DataIngestionDB inicializada correctamente';
 -- Migrar datos del Excel automáticamente
 PRINT 'Iniciando migración de datos del Excel...';
 
--- Insertar datos de tiradores únicos
+-- Insertar datos de tiradores únicos (valores numéricos limpios)
 INSERT INTO tiradores (nombre, edad, experiencia_anos, altura, peso, genero, mano_dominante)
 SELECT DISTINCT
     TRIM(nombre_tirador) as nombre,
     CAST(edad AS INT) as edad,
-    CAST(REPLACE(experiencia, ' años', '') AS INT) as experiencia_anos,
+    CAST(experiencia AS INT) as experiencia_anos,
     CAST(altura_tirador AS DECIMAL(4,2)) as altura,
-    CAST(REPLACE(REPLACE(peso, ' kg', ''), 'kg', '') AS DECIMAL(5,2)) as peso,
+    CAST(peso AS DECIMAL(5,2)) as peso,
     genero,
     CASE 
         WHEN LOWER(TRIM(diestro_zurdo)) LIKE '%diestro%' THEN 'Diestro'
@@ -331,21 +331,21 @@ SELECT DISTINCT
     END as mano_dominante
 FROM (
     VALUES 
-    ('Norberto', '24', '4 años', '1.7', '95 kg', 'Masculino', 'Diestro'),
-    ('Jaob', '19', '0 años', '1.7', '86 kg', 'Masculino', 'Diestro'),
-    ('Hilary', '19', '0 años', '1.55', '50 kg', 'Femenino', 'Diestro'),
-    ('Orlando', '26', '0 años', '1.67', '69 kg', 'Masculino', 'Diestro'),
-    ('Josué', '24', '0 años', '1.7', '50kg', 'Masculino', 'Diestro'),
-    ('Valentino', '24', '10 años', '1.85', '88 kg', 'Masculino', 'Diestro'),
-    ('Diego', '22', '4 años', '1.68', '58 kg', 'Masculino', 'Diestro'),
-    ('David', '20', '0 años', '1.7', '71 kg', 'Masculino', 'Diestro')
+    ('Norberto', 24, 4, 1.70, 95.0, 'Masculino', 'Diestro'),
+    ('Jaob', 19, 0, 1.70, 86.0, 'Masculino', 'Diestro'),
+    ('Hilary', 19, 0, 1.55, 50.0, 'Femenino', 'Diestro'),
+    ('Orlando', 26, 0, 1.67, 69.0, 'Masculino', 'Diestro'),
+    ('Josué', 24, 0, 1.70, 50.0, 'Masculino', 'Diestro'),
+    ('Valentino', 24, 10, 1.85, 88.0, 'Masculino', 'Diestro'),
+    ('Diego', 22, 4, 1.68, 58.0, 'Masculino', 'Diestro'),
+    ('David', 20, 0, 1.70, 71.0, 'Masculino', 'Diestro')
 ) AS datos_excel(nombre_tirador, edad, experiencia, altura_tirador, peso, genero, diestro_zurdo)
 WHERE NOT EXISTS (
     SELECT 1 FROM tiradores t 
     WHERE t.nombre = TRIM(datos_excel.nombre_tirador)
 );
 
--- Insertar sesiones de tiro
+-- Insertar sesiones de tiro (valores numéricos limpios)
 INSERT INTO sesiones_tiro (
     tirador_id, 
     distancia_metros, 
@@ -359,30 +359,30 @@ INSERT INTO sesiones_tiro (
 )
 SELECT 
     t.id as tirador_id,
-    CAST(REPLACE(REPLACE(distancia_tiro, ' metros', ''), ' metros ', '') AS DECIMAL(4,2)) as distancia_metros,
-    CAST(REPLACE(REPLACE(angulo, ' grados', ''), ' grados ', '') AS INT) as angulo_grados,
+    distancia_metros,
+    angulo_grados,
     ambiente,
-    CAST(REPLACE(peso_balon, ' g', '') AS DECIMAL(6,2)) as peso_balon,
-    CAST(calibre_balon AS INT) as calibre_balon,
-    CAST(REPLACE(REPLACE(tiempo_tiro, ' segundo', ''), ' segundos', '') AS DECIMAL(4,2)) as tiempo_tiro_segundos,
-    CAST(SUBSTRING(tiro_exitoso, 1, CHARINDEX(' de ', tiro_exitoso) - 1) AS INT) as tiros_exitosos,
-    CAST(SUBSTRING(tiro_exitoso, CHARINDEX(' de ', tiro_exitoso) + 4, LEN(tiro_exitoso)) AS INT) as tiros_totales
+    peso_balon,
+    calibre_balon,
+    tiempo_tiro_segundos,
+    tiros_exitosos,
+    tiros_totales
 FROM (
     VALUES 
-    ('Norberto', '5 metros ', '90 grados', 'Ventoso', '500 g', '6', '1 segundo', '2 de 6'),
-    ('Jaob', '5 metros', '90 grados ', 'Ventoso', '500 g', '6', '2 segundos', '0 de 6'),
-    ('Hilary', '3 metros', '90 grados', 'Ventoso', '500 g', '6', '1 segundo ', '1 de 6'),
-    ('Orlando', '5 metros', '90 grados', 'Ventoso', '500 g', '6', '2 segundos', '1 de 6'),
-    ('Josué', '5 metros', '90 grados', 'Ventoso', '500 g', '6', '1 segundo', '1 de 6'),
-    ('Valentino', '5 metros ', '90 grados', 'Ventoso', '500 g', '6', '2 segundos', '0 de 6'),
-    ('Diego', '5 metros', '90 grados', 'Ventoso', '500 g', '6', '1 segundo', '0 de 6'),
-    ('David', '5 metros ', '90 grados', 'Ventoso', '500 g', '6', '2 segundo', '1 de 6')
-) AS sesiones_excel(nombre_tirador, distancia_tiro, angulo, ambiente, peso_balon, calibre_balon, tiempo_tiro, tiro_exitoso)
+    ('Norberto', 5.0, 90, 'Ventoso', 500.0, 6, 1.0, 2, 6),
+    ('Jaob', 5.0, 90, 'Ventoso', 500.0, 6, 2.0, 0, 6),
+    ('Hilary', 3.0, 90, 'Ventoso', 500.0, 6, 1.0, 1, 6),
+    ('Orlando', 5.0, 90, 'Ventoso', 500.0, 6, 2.0, 1, 6),
+    ('Josué', 5.0, 90, 'Ventoso', 500.0, 6, 1.0, 1, 6),
+    ('Valentino', 5.0, 90, 'Ventoso', 500.0, 6, 2.0, 0, 6),
+    ('Diego', 5.0, 90, 'Ventoso', 500.0, 6, 1.0, 0, 6),
+    ('David', 5.0, 90, 'Ventoso', 500.0, 6, 2.0, 1, 6)
+) AS sesiones_excel(nombre_tirador, distancia_metros, angulo_grados, ambiente, peso_balon, calibre_balon, tiempo_tiro_segundos, tiros_exitosos, tiros_totales)
 INNER JOIN tiradores t ON t.nombre = sesiones_excel.nombre_tirador;
 
 PRINT 'Migración de datos del Excel completada exitosamente';
 
--- Insertar datos de ejemplo en la tabla tiro_excel (todas las 14 columnas)
+-- Insertar datos de ejemplo en la tabla tiro_excel (valores numéricos limpios)
 INSERT INTO tiro_excel (
     nombre_tirador, edad, experiencia, distancia_de_tiro, angulo, 
     altura_de_tirador, peso, ambiente, genero, peso_del_balon, 
@@ -390,40 +390,32 @@ INSERT INTO tiro_excel (
 )
 SELECT 
     nombre_tirador,
-    CAST(edad AS INT) as edad,
-    CAST(REPLACE(experiencia, ' años', '') AS INT) as experiencia,
-    CAST(REPLACE(REPLACE(distancia_tiro, ' metros', ''), ' metros ', '') AS DECIMAL(6,2)) as distancia_de_tiro,
-    CAST(REPLACE(REPLACE(angulo, ' grados', ''), ' grados ', '') AS INT) as angulo,
-    CAST(altura_tirador AS DECIMAL(4,2)) as altura_de_tirador,
-    CAST(REPLACE(REPLACE(peso, ' kg', ''), 'kg', '') AS DECIMAL(5,2)) as peso,
+    edad,
+    experiencia,
+    distancia_de_tiro,
+    angulo,
+    altura_de_tirador,
+    peso,
     ambiente,
     genero,
-    CAST(REPLACE(peso_balon, ' g', '') AS DECIMAL(6,2)) as peso_del_balon,
-    CAST(REPLACE(REPLACE(tiempo_tiro, ' segundo', ''), ' segundos', '') AS DECIMAL(4,2)) as tiempo_de_tiro,
-    CASE 
-        WHEN CAST(SUBSTRING(tiro_exitoso, 1, CHARINDEX(' de ', tiro_exitoso) - 1) AS INT) > 0 
-        THEN 1 
-        ELSE 0 
-    END as tiro_exitoso,
-    CASE 
-        WHEN LOWER(TRIM(diestro_zurdo)) LIKE '%diestro%' THEN 'Diestro'
-        WHEN LOWER(TRIM(diestro_zurdo)) LIKE '%zurdo%' THEN 'Zurdo'
-        ELSE TRIM(diestro_zurdo)
-    END as diestro_zurdo,
-    CAST(calibre_balon AS INT) as calibre_de_balon
+    peso_del_balon,
+    tiempo_de_tiro,
+    tiro_exitoso,
+    diestro_zurdo,
+    calibre_de_balon
 FROM (
     VALUES 
-    ('Norberto', '24', '4 años', '5 metros ', '90 grados', '1.7', '95 kg', 'Ventoso', 'Masculino', '500 g', '1 segundo', '2 de 6', 'Diestro', '6'),
-    ('Jaob', '19', '0 años', '5 metros', '90 grados ', '1.7', '86 kg', 'Ventoso', 'Masculino', '500 g', '2 segundos', '0 de 6', 'Diestro', '6'),
-    ('Hilary', '19', '0 años', '3 metros', '90 grados', '1.55', '50 kg', 'Ventoso', 'Femenino', '500 g', '1 segundo ', '1 de 6', 'Diestro', '6'),
-    ('Orlando', '26', '0 años', '5 metros', '90 grados', '1.67', '69 kg', 'Ventoso', 'Masculino', '500 g', '2 segundos', '1 de 6', 'Diestro', '6'),
-    ('Josué', '24', '0 años', '5 metros', '90 grados', '1.7', '50kg', 'Ventoso', 'Masculino', '500 g', '1 segundo', '1 de 6', 'Diestro', '6'),
-    ('Valentino', '24', '10 años', '5 metros ', '90 grados', '1.85', '88 kg', 'Ventoso', 'Masculino', '500 g', '2 segundos', '0 de 6', 'Diestro', '6'),
-    ('Diego', '22', '4 años', '5 metros', '90 grados', '1.68', '58 kg', 'Ventoso', 'Masculino', '500 g', '1 segundo', '0 de 6', 'Diestro', '6'),
-    ('David', '20', '0 años', '5 metros ', '90 grados', '1.7', '71 kg', 'Ventoso', 'Masculino', '500 g', '2 segundo', '1 de 6', 'Diestro', '6')
+    ('Norberto', 24, 4, 5.0, 90, 1.70, 95.0, 'Ventoso', 'Masculino', 500.0, 1.0, 1, 'Diestro', 6),
+    ('Jaob', 19, 0, 5.0, 90, 1.70, 86.0, 'Ventoso', 'Masculino', 500.0, 2.0, 0, 'Diestro', 6),
+    ('Hilary', 19, 0, 3.0, 90, 1.55, 50.0, 'Ventoso', 'Femenino', 500.0, 1.0, 1, 'Diestro', 6),
+    ('Orlando', 26, 0, 5.0, 90, 1.67, 69.0, 'Ventoso', 'Masculino', 500.0, 2.0, 1, 'Diestro', 6),
+    ('Josué', 24, 0, 5.0, 90, 1.70, 50.0, 'Ventoso', 'Masculino', 500.0, 1.0, 1, 'Diestro', 6),
+    ('Valentino', 24, 10, 5.0, 90, 1.85, 88.0, 'Ventoso', 'Masculino', 500.0, 2.0, 0, 'Diestro', 6),
+    ('Diego', 22, 4, 5.0, 90, 1.68, 58.0, 'Ventoso', 'Masculino', 500.0, 1.0, 0, 'Diestro', 6),
+    ('David', 20, 0, 5.0, 90, 1.70, 71.0, 'Ventoso', 'Masculino', 500.0, 2.0, 1, 'Diestro', 6)
 ) AS excel_data(
-    nombre_tirador, edad, experiencia, distancia_tiro, angulo, altura_tirador, 
-    peso, ambiente, genero, peso_balon, tiempo_tiro, tiro_exitoso, diestro_zurdo, calibre_balon
+    nombre_tirador, edad, experiencia, distancia_de_tiro, angulo, altura_de_tirador, 
+    peso, ambiente, genero, peso_del_balon, tiempo_de_tiro, tiro_exitoso, diestro_zurdo, calibre_de_balon
 )
 WHERE NOT EXISTS (
     SELECT 1 FROM tiro_excel te 

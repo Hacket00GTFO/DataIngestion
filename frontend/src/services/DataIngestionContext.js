@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useRef } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback } from 'react';
 import { dataIngestionAPI } from './api';
 
 const DataIngestionContext = createContext();
@@ -88,7 +88,7 @@ export const DataIngestionProvider = ({ children }) => {
     }
   };
 
-  const getData = async () => {
+  const getData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -100,7 +100,7 @@ export const DataIngestionProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const getStatistics = async () => {
     try {
@@ -116,11 +116,11 @@ export const DataIngestionProvider = ({ children }) => {
     }
   };
 
-  const getSchema = async () => {
+  const getSchema = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await dataIngestionAPI.getSchema();
+      const response = await cachedApiCall('getSchema', () => dataIngestionAPI.getSchema(), {}, true);
       return response;
     } catch (err) {
       setError(err.message);
@@ -128,7 +128,7 @@ export const DataIngestionProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const getTiradoresStatistics = async () => {
     try {
@@ -200,11 +200,11 @@ export const DataIngestionProvider = ({ children }) => {
     }
   };
 
-  const getDataSchema = async () => {
+  const getDataSchema = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await dataIngestionAPI.getDataSchema();
+      const response = await cachedApiCall('getDataSchema', () => dataIngestionAPI.getDataSchema(), {}, true);
       return response;
     } catch (err) {
       setError(err.message);
@@ -212,7 +212,7 @@ export const DataIngestionProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const deleteAllData = async () => {
     try {
