@@ -1,0 +1,4 @@
+Segunda prueba de sincronización automática
+Usuario: NorbertoSuas
+Fecha: $(date)
+Estado: Protección desactivada

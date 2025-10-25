@@ -1,0 +1,76 @@
+name: Sync Backend and Frontend branches
+
+on:
+  push:
+    branches:
+      - Development
+  pull_request:
+    types: [closed]
+    branches:
+      - Development
+
+jobs:
+  sync-branches:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+      
+      - name: Verify permissions and fetch branches
+        run: |
+          # Fetch all branches
+          git fetch origin
+          echo "✅ Successfully fetched all branches"
+          echo "Current repository: $(git remote get-url origin)"
+      
+      - name: Sync Backend branch
+        run: |
+          # Check if Backend branch exists
+          if git show-ref --verify --quiet refs/remotes/origin/Backend; then
+            echo "Backend branch exists, syncing..."
+            git checkout Backend
+            git merge origin/Development --no-edit
+            git push origin Backend
+            echo "Backend branch synced successfully"
+          else
+            echo "Backend branch does not exist, creating it from Development..."
+            git checkout -b Backend origin/Development
+            git push origin Backend
+            echo "Backend branch created successfully"
+          fi
+      
+      - name: Sync Frontend branch
+        run: |
+          # Check if Frontend branch exists
+          if git show-ref --verify --quiet refs/remotes/origin/Frontend; then
+            echo "Frontend branch exists, syncing..."
+            git checkout Frontend
+            git merge origin/Development --no-edit
+            git push origin Frontend
+            echo "Frontend branch synced successfully"
+          else
+            echo "Frontend branch does not exist, creating it from Development..."
+            git checkout -b Frontend origin/Development
+            git push origin Frontend
+            echo "Frontend branch created successfully"
+          fi
+      
+      - name: Summary
+        run: |
+          echo "✅ Branch synchronization completed successfully!"
+          echo "📋 Summary:"
+          echo "  - Backend branch: $(git show-ref --verify --quiet refs/remotes/origin/Backend && echo 'synced' || echo 'created')"
+          echo "  - Frontend branch: $(git show-ref --verify --quiet refs/remotes/origin/Frontend && echo 'synced' || echo 'created')"
